@@ -369,15 +369,15 @@
         <section class="page stack">
           <div>
             <h1 class="heading">Picks</h1>
-            <p class="section-subtitle">View all player selections for locked matches</p>
+            <p class="section-subtitle">View all player selections for locked matches and upcoming matches within the next 48 hours</p>
           </div>
 
           <div>
             <label class="label">Select Match</label>
             <select class="select" [ngModel]="picksMatchId() ?? ''" (ngModelChange)="openPicksMatch($event)">
-              <option value="">-- Select a locked match --</option>
-              @for (match of lockedMatches(); track match.id) {
-                <option [value]="match.id">M{{ match.id }}: {{ match.home }} vs {{ match.away }} — {{ match.date }}</option>
+              <option value="">-- Select a locked or next-48-hours match --</option>
+              @for (match of picksVisibleMatches(); track match.id) {
+                <option [value]="match.id">{{ getPicksMatchOptionLabel(match) }}</option>
               }
             </select>
           </div>
@@ -721,9 +721,9 @@
             <div>
               <label class="label">Select Match</label>
               <select class="select" [ngModel]="picksMatchId() ?? ''" (ngModelChange)="openPicksMatch($event)">
-                <option value="">-- Select a locked match --</option>
-                @for (match of lockedMatches(); track match.id) {
-                  <option [value]="match.id">M{{ match.id }}: {{ match.home }} vs {{ match.away }} — {{ match.date }}</option>
+                <option value="">-- Select a locked or next-48-hours match --</option>
+                @for (match of picksVisibleMatches(); track match.id) {
+                  <option [value]="match.id">{{ getPicksMatchOptionLabel(match) }}</option>
                 }
               </select>
             </div>
@@ -838,11 +838,11 @@
           @if (adminTab() === 'results') {
             <div class="two-col">
               <div class="stack">
-                <div class="section-title">Locked / Completed Matches</div>
-                @if (lockedMatches().length === 0) {
-                  <div class="muted">No locked matches yet</div>
+                <div class="section-title">All Matches</div>
+                @if (matches().length === 0) {
+                  <div class="muted">No matches available</div>
                 }
-                @for (match of lockedMatches(); track match.id) {
+                @for (match of matches(); track match.id) {
                   <div class="card match-card" (click)="openAdminMatch(match)">
                     <div class="toolbar" style="justify-content: space-between;">
                       <div class="toolbar">
@@ -853,9 +853,18 @@
                         <img class="team-logo" style="width: 32px; height: 32px;" [src]="teamMeta[match.away].logoUrl" [alt]="match.away" />
                         <strong>{{ match.away }}</strong>
                       </div>
-                      @if (results()[match.id]) { <span class="success-text">✓</span> }
+                      <div class="toolbar">
+                        <span class="chip info">{{ getAdminLockLabel(match) }}</span>
+                        @if (results()[match.id]) { <span class="success-text">✓</span> }
+                      </div>
                     </div>
-                    <div class="small-text" style="margin-left: 44px;">{{ match.date }}</div>
+                    <div class="toolbar" style="justify-content: space-between; margin-left: 44px; margin-top: 8px;">
+                      <div class="small-text">{{ match.date }}</div>
+                      <div class="toolbar">
+                        <button class="button ghost" style="padding: 6px 10px;" (click)="setMatchLockState(match, true, $event)">Lock</button>
+                        <button class="button ghost" style="padding: 6px 10px;" (click)="setMatchLockState(match, false, $event)">Unlock</button>
+                      </div>
+                    </div>
                   </div>
                 }
               </div>

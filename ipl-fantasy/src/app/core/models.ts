@@ -11,6 +11,7 @@ export interface MatchRecord {
   date: string;
   time_label: string;
   lock_time: string;
+  manual_lock_state: number | null;
 }
 
 export interface MatchResult {

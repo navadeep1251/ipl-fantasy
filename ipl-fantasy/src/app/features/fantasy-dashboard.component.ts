@@ -17,6 +17,7 @@ import {
   buildOverallLeaderboard,
   calculateScore,
   getMatchStatus,
+  isMatchLocked,
   getUniqueMatchPlayers,
   triggerInsightsUpdate,
 } from '../core/fantasy.utils';
@@ -165,7 +166,25 @@ export class FantasyDashboardComponent {
     });
   });
 
-  readonly lockedMatches = computed(() => this.matches().filter((match) => this.now() >= new Date(match.lock_time)));
+  readonly lockedMatches = computed(() => this.matches().filter((match) => !!this.results()[match.id] || isMatchLocked(match, this.now())));
+  readonly picksVisibleMatches = computed(() => {
+    const now = this.now();
+    const windowEnd = now.getTime() + 48 * 60 * 60 * 1000;
+    const visible = new Map<number, MatchRecord>();
+    this.lockedMatches().forEach((match) => visible.set(match.id, match));
+    this.matches()
+      .filter((match) => {
+        if (this.results()[match.id] || isMatchLocked(match, now)) {
+          return false;
+        }
+
+        const lockTime = new Date(match.lock_time).getTime();
+        return lockTime >= now.getTime() && lockTime <= windowEnd;
+      })
+      .forEach((match) => visible.set(match.id, match));
+
+    return Array.from(visible.values()).sort((left, right) => left.id - right.id);
+  });
   readonly currentMatchPlayers = computed(() => (this.selectedMatch() ? getUniqueMatchPlayers(this.selectedMatch()!) : []));
   readonly selectedMatchScore = computed(() => {
     const match = this.selectedMatch();
@@ -325,7 +344,7 @@ export class FantasyDashboardComponent {
   async saveSelection() {
     const match = this.selectedMatch();
     const currentUser = this.user();
-    if (!match || !currentUser || new Date() >= new Date(match.lock_time)) {
+    if (!match || !currentUser || isMatchLocked(match, new Date())) {
       return;
     }
 
@@ -348,6 +367,35 @@ export class FantasyDashboardComponent {
 
   getStatus(match: MatchRecord, now = this.now()) {
     return getMatchStatus(match, now, this.results(), this.currentUserSelections());
+  }
+
+  getPicksMatchOptionLabel(match: MatchRecord) {
+    const status = this.getStatus(match);
+    const suffix = status === 'completed' ? 'Completed' : status === 'locked' ? 'Locked' : 'Next 48h';
+    return `M${match.id}: ${match.home} vs ${match.away} — ${match.date} (${suffix})`;
+  }
+
+  getAdminLockLabel(match: MatchRecord) {
+    if (this.results()[match.id]) {
+      return '✓ Completed';
+    }
+
+    if (match.manual_lock_state === 1) {
+      return '🔒 Admin Locked';
+    }
+
+    if (match.manual_lock_state === 0) {
+      return '🔓 Admin Unlocked';
+    }
+
+    return isMatchLocked(match, this.now()) ? '🔒 Time Locked' : '🕒 Auto';
+  }
+
+  async setMatchLockState(match: MatchRecord, shouldLock: boolean, event?: Event) {
+    event?.stopPropagation();
+    const manualLockState = shouldLock ? 1 : 0;
+    await this.dataService.setMatchManualLockState(match.id, manualLockState);
+    this.matches.update((rows) => rows.map((row) => (row.id === match.id ? { ...row, manual_lock_state: manualLockState } : row)));
   }
 
   isTomorrowMatch(match: MatchRecord): boolean {

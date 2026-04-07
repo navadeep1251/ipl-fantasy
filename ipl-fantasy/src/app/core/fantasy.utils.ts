@@ -13,6 +13,18 @@ import { FANTASY_PLAYERS, TEAM_PLAYERS, scoreKeyFromDoubleCategory } from './ipl
 const FIRST_PLACE_PRIZE = 3;
 const SECOND_PLACE_PRIZE = 2;
 
+export function isMatchLocked(match: MatchRecord, now: Date): boolean {
+  if (match.manual_lock_state === 1) {
+    return true;
+  }
+
+  if (match.manual_lock_state === 0) {
+    return false;
+  }
+
+  return now >= new Date(match.lock_time);
+}
+
 export function getMatchStatus(
   match: MatchRecord,
   now: Date,
@@ -23,7 +35,7 @@ export function getMatchStatus(
     return 'completed';
   }
 
-  if (now >= new Date(match.lock_time)) {
+  if (isMatchLocked(match, now)) {
     return 'locked';
   }
 
@@ -120,7 +132,7 @@ export function buildOverallLeaderboard(
   results: Record<number, MatchResult>,
   playerScores: PlayerScoresMap,
 ): Array<{ name: string; total: number; matchCount: number }> {
-  const lockedMatches = matches.filter((match) => new Date() >= new Date(match.lock_time));
+  const lockedMatches = matches.filter((match) => !!results[match.id] || isMatchLocked(match, new Date()));
 
   return FANTASY_PLAYERS.map((name) => {
     const normalized = name.toLowerCase().replace(/\s/g, '_');
@@ -147,7 +159,7 @@ export function buildConsolidatedTable(
   results: Record<number, MatchResult>,
   playerScores: PlayerScoresMap,
 ) {
-  const lockedMatches = matches.filter((match) => new Date() >= new Date(match.lock_time));
+  const lockedMatches = matches.filter((match) => !!results[match.id] || isMatchLocked(match, new Date()));
   const pointsByPlayer: Record<string, Record<number, number>> = {};
   const totalPoints: Record<string, number> = {};
   const winningsByPlayer: Record<string, Record<number, number>> = {};

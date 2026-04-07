@@ -135,7 +135,8 @@ export class SQLiteService {
         away TEXT NOT NULL,
         date TEXT NOT NULL,
         time_label TEXT NOT NULL,
-        lock_time TEXT NOT NULL
+        lock_time TEXT NOT NULL,
+        manual_lock_state INTEGER DEFAULT NULL
       );
 
       CREATE TABLE IF NOT EXISTS results (
@@ -207,6 +208,10 @@ export class SQLiteService {
         PRIMARY KEY (match_id, player_name)
       );
     `);
+
+    try {
+      db.run('ALTER TABLE matches ADD COLUMN manual_lock_state INTEGER DEFAULT NULL');
+    } catch {}
   }
 
   private seedIfNeeded(db: SqlJsDatabase): void {
@@ -230,8 +235,8 @@ export class SQLiteService {
 
       for (const match of seedMatches) {
         db.run(
-          'INSERT INTO matches (id, home, away, date, time_label, lock_time) VALUES (?, ?, ?, ?, ?, ?)',
-          [match.id, match.home, match.away, match.date, match.time_label, match.lock_time],
+          'INSERT INTO matches (id, home, away, date, time_label, lock_time, manual_lock_state) VALUES (?, ?, ?, ?, ?, ?, ?)',
+          [match.id, match.home, match.away, match.date, match.time_label, match.lock_time, match.manual_lock_state],
         );
       }
 

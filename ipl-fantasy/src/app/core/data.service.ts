@@ -38,13 +38,23 @@ export class DataService {
   }
 
   async loadDashboard() {
-    const [matches, resultsRows, selectionsRows, insightsRows, playerScoreRows] = await Promise.all([
-      this.sqlite.all<MatchRecord>('SELECT * FROM matches ORDER BY id ASC'),
+    const [matchRows, resultsRows, selectionsRows, insightsRows, playerScoreRows] = await Promise.all([
+      this.sqlite.all<MatchRow>('SELECT * FROM matches ORDER BY id ASC'),
       this.sqlite.all<ResultRow>('SELECT * FROM results'),
       this.sqlite.all<SelectionRow>('SELECT * FROM selections'),
       this.sqlite.all<InsightRow>('SELECT * FROM match_insights').catch(() => []),
       this.sqlite.all<PlayerScore>('SELECT * FROM player_scores').catch(() => []),
     ]);
+
+    const matches: MatchRecord[] = (matchRows || []).map((row) => ({
+      id: row.id,
+      home: row.home,
+      away: row.away,
+      date: row.date,
+      time_label: row.time_label,
+      lock_time: row.lock_time,
+      manual_lock_state: row.manual_lock_state ?? null,
+    }));
 
     const results: ResultMap = {};
     for (const row of resultsRows || []) {
@@ -220,6 +230,10 @@ export class DataService {
     await this.sqlite.run('UPDATE users SET password = ? WHERE username = ?', [password, normalizeFantasyUsername(username.trim())]);
   }
 
+  async setMatchManualLockState(matchId: number, manualLockState: number | null): Promise<void> {
+    await this.sqlite.run('UPDATE matches SET manual_lock_state = ? WHERE id = ?', [manualLockState, matchId]);
+  }
+
   emptySelection() {
     return { ...EMPTY_SELECTION };
   }
@@ -267,6 +281,16 @@ interface ArrayUserRow {
   display_name: string;
   password: string;
   is_admin: boolean;
+}
+
+interface MatchRow {
+  id: number;
+  home: string;
+  away: string;
+  date: string;
+  time_label: string;
+  lock_time: string;
+  manual_lock_state: number | null;
 }
 
 interface ResultRow {

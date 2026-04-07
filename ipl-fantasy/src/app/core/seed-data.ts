@@ -15,6 +15,7 @@ export interface SeedMatch {
   date: string;
   time_label: string;
   lock_time: string;
+  manual_lock_state: number | null;
 }
 
 export const seedVersion = '2026-fresh-start-v3';
@@ -116,6 +117,7 @@ export const seedMatches: SeedMatch[] = seedMatchRows.map(([id, home, away, date
   date,
   time_label,
   lock_time,
+  manual_lock_state: null,
 }));
 
 export const seedResults: any[] = [];
