@@ -352,6 +352,12 @@ export class SQLiteService {
 
     db.run('BEGIN');
     try {
+      if (previousVersion) {
+        db.run('DELETE FROM results');
+        db.run('DELETE FROM selections');
+        db.run('DELETE FROM player_scores');
+      }
+
       for (const user of seedUsers) {
         db.run(
           `INSERT INTO users (username, display_name, password, is_admin, created_at)

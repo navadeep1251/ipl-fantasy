@@ -10,6 +10,9 @@ import {
 } from './models';
 import { FANTASY_PLAYERS, TEAM_PLAYERS, scoreKeyFromDoubleCategory } from './ipl-data';
 
+const FIRST_PLACE_PRIZE = 3;
+const SECOND_PLACE_PRIZE = 2;
+
 export function getMatchStatus(
   match: MatchRecord,
   now: Date,
@@ -188,14 +191,15 @@ export function buildConsolidatedTable(
       }
 
       if (first.length === 2) {
-        first.forEach((row) => (winningsByPlayer[row.player][match.id] = 18.5));
+        const split = Number(((FIRST_PLACE_PRIZE + SECOND_PLACE_PRIZE) / first.length).toFixed(2));
+        first.forEach((row) => (winningsByPlayer[row.player][match.id] = split));
       } else if (first.length > 2) {
-        const split = Number((37 / first.length).toFixed(2));
+        const split = Number(((FIRST_PLACE_PRIZE + SECOND_PLACE_PRIZE) / first.length).toFixed(2));
         first.forEach((row) => (winningsByPlayer[row.player][match.id] = split));
       } else if (first.length === 1) {
-        winningsByPlayer[first[0].player][match.id] = 25;
+        winningsByPlayer[first[0].player][match.id] = FIRST_PLACE_PRIZE;
         if (second.length) {
-          const split = Number((12 / second.length).toFixed(2));
+          const split = Number((SECOND_PLACE_PRIZE / second.length).toFixed(2));
           second.forEach((row) => (winningsByPlayer[row.player][match.id] = split));
         }
       }

@@ -17,7 +17,7 @@ export interface SeedMatch {
   lock_time: string;
 }
 
-export const seedVersion = '2026-password-defaults-v2';
+export const seedVersion = '2026-fresh-start-v3';
 
 export const seedUsers: SeedUser[] = [
   {
@@ -118,134 +118,11 @@ export const seedMatches: SeedMatch[] = seedMatchRows.map(([id, home, away, date
   lock_time,
 }));
 
-export const seedResults = [
-  {
-    match_id: 1,
-    winning_team: 'RCB',
-    win_by_runs: 0,
-    run_margin: 0,
-    wicket_margin: 5,
-    top_scorer: 'Virat Kohli',
-    top_scorer_runs: 82,
-    best_bowler: 'Harshal Patel',
-    best_bowler_points: 3,
-    powerplay_winner: 'RCB',
-    powerplay_score: 58,
-    powerplay_diff: 10,
-    dot_ball_leader: 'Harshal Patel',
-    dot_balls: 15,
-    total_wickets: 11,
-    wickets_range: '9-11',
-    duck_batsmen: JSON.stringify(['Ishan Kishan']),
-    match_top_player: 'Siddu',
-    match_bottom_player: 'Pa1',
-  },
-];
+export const seedResults: any[] = [];
 
-export const seedSelections = [
-  {
-    username: 'siddu',
-    match_id: 1,
-    winning_team: 'RCB',
-    best_batsman: 'Virat Kohli',
-    best_bowler: 'Harshal Patel',
-    powerplay_winner: 'RCB',
-    dot_ball_bowler: 'Harshal Patel',
-    total_wickets: '9-11',
-    duck_batsman: 'Ishan Kishan',
-    double_category: 'Best Batsman',
-    winning_horse: 'Siddu',
-    losing_horse: 'Pa1',
-    saved_at: '2026-03-28T17:00:00.000Z',
-  },
-  {
-    username: 'venky',
-    match_id: 1,
-    winning_team: 'SRH',
-    best_batsman: 'Virat Kohli',
-    best_bowler: 'Harshal Patel',
-    powerplay_winner: 'RCB',
-    dot_ball_bowler: 'Harshal Patel',
-    total_wickets: '9-11',
-    duck_batsman: 'Ishan Kishan',
-    double_category: 'Dot-Ball Bowler',
-    winning_horse: 'Siddu',
-    losing_horse: 'Pa1',
-    saved_at: '2026-03-28T17:05:00.000Z',
-  },
-  {
-    username: 'sampath',
-    match_id: 2,
-    winning_team: 'MI',
-    best_batsman: 'Rohit Sharma',
-    best_bowler: 'Varun Chakravarthy',
-    powerplay_winner: 'MI',
-    dot_ball_bowler: 'Varun Chakravarthy',
-    total_wickets: '9-11',
-    duck_batsman: 'Ajinkya Rahane',
-    double_category: 'Winning Team',
-    winning_horse: 'Venky',
-    losing_horse: 'Pa1',
-    saved_at: '2026-03-29T16:30:00.000Z',
-  },
-  {
-    username: 'navdeep',
-    match_id: 2,
-    winning_team: 'KKR',
-    best_batsman: 'Rohit Sharma',
-    best_bowler: 'Varun Chakravarthy',
-    powerplay_winner: 'MI',
-    dot_ball_bowler: 'Varun Chakravarthy',
-    total_wickets: '9-11',
-    duck_batsman: 'Ajinkya Rahane',
-    double_category: 'Best Bowler',
-    winning_horse: 'Siddu',
-    losing_horse: 'Pa1',
-    saved_at: '2026-03-29T16:35:00.000Z',
-  },
-];
+export const seedSelections: any[] = [];
 
-export const seedPlayerScores = [
-  {
-    match_id: 1,
-    player_name: 'Virat Kohli',
-    runs: 82,
-    fours: 8,
-    sixes: 3,
-    wickets: null,
-    maidens: null,
-    dot_balls: null,
-    batsman_score: 122,
-    bowler_score: null,
-    dot_ball_score: null,
-  },
-  {
-    match_id: 1,
-    player_name: 'Harshal Patel',
-    runs: null,
-    fours: null,
-    sixes: null,
-    wickets: 3,
-    maidens: 1,
-    dot_balls: 15,
-    batsman_score: null,
-    bowler_score: 100,
-    dot_ball_score: 75,
-  },
-  {
-    match_id: 1,
-    player_name: 'Ishan Kishan',
-    runs: 0,
-    fours: 0,
-    sixes: 0,
-    wickets: null,
-    maidens: null,
-    dot_balls: null,
-    batsman_score: 0,
-    bowler_score: null,
-    dot_ball_score: null,
-  },
-];
+export const seedPlayerScores: any[] = [];
 
 export const seedInsights = [
   {
