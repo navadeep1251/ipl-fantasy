@@ -1,4 +1,4 @@
-import { FANTASY_PLAYERS, TEAM_PLAYERS, normalizeFantasyUsername } from './ipl-data';
+import { FANTASY_PLAYERS, TEAM_PLAYERS, getDefaultPlayerPassword, normalizeFantasyUsername } from './ipl-data';
 
 export interface SeedUser {
   username: string;
@@ -17,7 +17,7 @@ export interface SeedMatch {
   lock_time: string;
 }
 
-export const seedVersion = '2026-user-reset-v1';
+export const seedVersion = '2026-password-defaults-v2';
 
 export const seedUsers: SeedUser[] = [
   {
@@ -30,7 +30,7 @@ export const seedUsers: SeedUser[] = [
   ...FANTASY_PLAYERS.map((name) => ({
     username: normalizeFantasyUsername(name),
     display_name: name,
-    password: 'ipl2026',
+    password: getDefaultPlayerPassword(name),
     is_admin: 0,
     created_at: '2026-03-20T10:10:00.000Z',
   })),

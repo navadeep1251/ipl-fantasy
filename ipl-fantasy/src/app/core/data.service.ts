@@ -1,5 +1,5 @@
 import { Injectable } from '@angular/core';
-import { EMPTY_SELECTION } from './ipl-data';
+import { EMPTY_SELECTION, normalizeFantasyUsername } from './ipl-data';
 import {
   InsightMap,
   MatchInsights,
@@ -217,7 +217,7 @@ export class DataService {
   }
 
   async resetPassword(username: string, password: string): Promise<void> {
-    await this.sqlite.run('UPDATE users SET password = ? WHERE username = ?', [password, username]);
+    await this.sqlite.run('UPDATE users SET password = ? WHERE username = ?', [password, normalizeFantasyUsername(username.trim())]);
   }
 
   emptySelection() {

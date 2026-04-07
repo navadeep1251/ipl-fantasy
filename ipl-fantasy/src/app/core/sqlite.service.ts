@@ -1,4 +1,5 @@
 import { Injectable } from '@angular/core';
+import { DEFAULT_PLAYER_PASSWORDS } from './ipl-data';
 import { seedInsights, seedMatches, seedPlayerScores, seedResults, seedSelections, seedUsers, seedVersion } from './seed-data';
 
 declare global {
@@ -75,16 +76,13 @@ export class SQLiteService {
 
   private async initialize(): Promise<SqlJsDatabase> {
     const SQL = await this.loadSqlJs();
-    const shouldReset = localStorage.getItem(this.versionKey) !== seedVersion;
-    if (shouldReset) {
-      localStorage.removeItem(this.storageKey);
-    }
-
-    const saved = shouldReset ? null : localStorage.getItem(this.storageKey);
+    const previousVersion = localStorage.getItem(this.versionKey);
+    const saved = localStorage.getItem(this.storageKey);
     const db = saved ? new SQL.Database(this.base64ToUint8Array(saved)) : new SQL.Database();
 
     this.createSchema(db);
     this.seedIfNeeded(db);
+    this.migrateSeedData(db, previousVersion);
     this.persist(db);
 
     return db;
@@ -338,6 +336,35 @@ export class SQLiteService {
             score.dot_ball_score,
           ],
         );
+      }
+
+      db.run('COMMIT');
+    } catch (error) {
+      db.run('ROLLBACK');
+      throw error;
+    }
+  }
+
+  private migrateSeedData(db: SqlJsDatabase, previousVersion: string | null): void {
+    if (previousVersion === seedVersion) {
+      return;
+    }
+
+    db.run('BEGIN');
+    try {
+      for (const user of seedUsers) {
+        db.run(
+          `INSERT INTO users (username, display_name, password, is_admin, created_at)
+           VALUES (?, ?, ?, ?, ?)
+           ON CONFLICT(username) DO UPDATE SET
+             display_name = excluded.display_name,
+             is_admin = excluded.is_admin`,
+          [user.username, user.display_name, user.password, user.is_admin, user.created_at],
+        );
+      }
+
+      for (const [username, password] of Object.entries(DEFAULT_PLAYER_PASSWORDS)) {
+        db.run('UPDATE users SET password = ? WHERE username = ?', [password, username]);
       }
 
       db.run('COMMIT');

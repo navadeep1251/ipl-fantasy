@@ -2,6 +2,7 @@ import { CommonModule } from '@angular/common';
 import { Component, OnDestroy, computed, effect, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import {
+  getDefaultPlayerPassword,
   DOUBLE_CATEGORIES,
   EMPTY_SELECTION,
   FANTASY_PLAYERS,
@@ -618,8 +619,7 @@ export class FantasyDashboardComponent {
   }
 
   async resetPassword(username: string) {
-    const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789';
-    const password = Array.from({ length: 6 }, () => chars[Math.floor(Math.random() * chars.length)]).join('');
+    const password = getDefaultPlayerPassword(username);
     await this.dataService.resetPassword(username, password);
     this.users.update((rows) => rows.map((row) => (row.username === username ? { ...row, password } : row)));
     this.passwordResetInfo.set({ username, newPwd: password });
