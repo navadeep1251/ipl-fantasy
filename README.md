@@ -35,6 +35,12 @@ To publish:
 3. Under **Build and deployment**, set **Source** to **GitHub Actions**.
 4. Future pushes to `main` will build from `ipl-fantasy/` and deploy automatically.
 
+Notes:
+
+- The workflow runs from the repository root and builds the Angular app from `ipl-fantasy/`.
+- The Pages base path is detected from the GitHub repository name automatically.
+- The site URL will be `https://<account>.github.io/my-first-ai-app/` once Pages is enabled and the workflow succeeds.
+
 For local Pages validation:
 
 ```bash
