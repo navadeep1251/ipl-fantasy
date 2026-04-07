@@ -1,0 +1,1047 @@
+@if (!user()) {
+  <div class="app-shell">
+    <div class="noise"></div>
+    <div class="login-shell content">
+      <div class="login-panel">
+        <div class="centered" style="margin-bottom: 40px;">
+          <div style="font-size: 40px; margin-bottom: 8px;">🏏</div>
+          <div class="logo" style="font-size: 28px; display: block; margin-bottom: 6px;">IPL FANTASY</div>
+          <div class="small-text">2026 Season — Friends League</div>
+        </div>
+
+        <div class="card stack">
+          <div>
+            <label class="label">Username</label>
+            <input class="input" [(ngModel)]="loginUsername" placeholder="e.g. siddu" (keydown.enter)="login()" />
+            <div class="small-text" style="margin-top: 4px;">Use lowercase usernames like siddu, venky, sampath, pa1, navdeep</div>
+          </div>
+
+          <div>
+            <label class="label">Password</label>
+            <input class="input" [(ngModel)]="loginPassword" type="password" placeholder="Your password" (keydown.enter)="login()" />
+          </div>
+
+          @if (loginError()) {
+            <div class="danger-text">⚠ {{ loginError() }}</div>
+          }
+
+          <button class="button primary" (click)="login()" [disabled]="signingIn()">
+            {{ signingIn() ? 'Signing in...' : 'Sign In' }}
+          </button>
+        </div>
+
+        <div class="centered small-text" style="margin-top: 20px;">Forgot your password? Ask the admin to reset it.</div>
+      </div>
+    </div>
+  </div>
+} @else if (loading()) {
+  <div class="app-shell">
+    <div class="noise"></div>
+    <div class="content page centered" style="padding-top: 20vh;">
+      <div style="font-size: 40px; margin-bottom: 12px;">🏏</div>
+      <div class="logo" style="font-size: 22px; display: block; margin-bottom: 8px;">IPL FANTASY 2026</div>
+      <div class="small-text">Loading match data...</div>
+    </div>
+  </div>
+} @else {
+  <div class="app-shell">
+    <div class="noise"></div>
+
+    <div class="content">
+      <header class="header">
+        <div class="logo">🏏 IPL FANTASY</div>
+        <div class="toolbar">
+          <span class="small-text">{{ user()!.displayName }}</span>
+          <button class="button danger" style="padding: 6px 12px;" (click)="logout()">Logout</button>
+        </div>
+      </header>
+
+      @if (selectedMatch()) {
+        <section class="page stack">
+          <button class="button ghost" style="width: fit-content;" (click)="closeMatch()">← Back</button>
+
+          <div class="stack">
+            <div class="match-header">
+              <div class="team-badge" [ngStyle]="teamBadgeStyle(selectedMatch()!.home)">
+                <img class="team-logo" style="width: 40px; height: 40px;" [src]="teamMeta[selectedMatch()!.home].logoUrl" [alt]="selectedMatch()!.home" />
+                <span>{{ selectedMatch()!.home }}</span>
+              </div>
+              <span class="muted" style="font-weight: 800;">VS</span>
+              <div class="team-badge" [ngStyle]="teamBadgeStyle(selectedMatch()!.away)">
+                <img class="team-logo" style="width: 40px; height: 40px;" [src]="teamMeta[selectedMatch()!.away].logoUrl" [alt]="selectedMatch()!.away" />
+                <span>{{ selectedMatch()!.away }}</span>
+              </div>
+              <span class="status-pill {{ getStatus(selectedMatch()!) }}">{{ getStatus(selectedMatch()!) | titlecase }}</span>
+            </div>
+
+            <div class="match-meta">
+              <span class="chip warn">Match {{ selectedMatch()!.id }}</span>
+              <span class="small-text">{{ selectedMatch()!.date }} · {{ selectedMatch()!.time_label }}</span>
+            </div>
+          </div>
+
+          @if (getStatus(selectedMatch()!) === 'locked' && !results()[selectedMatch()!.id]) {
+            <div class="card danger-text">🔒 Match has started. Selections are locked.</div>
+          }
+
+          @if (insights()[selectedMatch()!.id]) {
+            <div class="card stack">
+              <div class="toolbar" style="justify-content: space-between;">
+                <div class="toolbar">
+                  <span style="font-size: 16px;">📊</span>
+                  <span class="blue-text" style="font-weight: 700;">Match Insights</span>
+                  <span class="chip info">AI · {{ getInsightsAgeLabel(insights()[selectedMatch()!.id].generated_at) }}</span>
+                </div>
+                <button class="tab-button" (click)="insightsExpanded.set(!insightsExpanded())">{{ insightsExpanded() ? '▲' : '▼' }}</button>
+              </div>
+
+              @if (insightsExpanded()) {
+                <div class="tab-strip">
+                  <button class="tab-button" [class.active]="insightsPanelTab() === 'xi'" (click)="insightsPanelTab.set('xi')">Probable XI</button>
+                  <button class="tab-button" [class.active]="insightsPanelTab() === 'form'" (click)="insightsPanelTab.set('form')">Form Guide</button>
+                  <button class="tab-button" [class.active]="insightsPanelTab() === 'pitch'" (click)="insightsPanelTab.set('pitch')">Pitch & H2H</button>
+                </div>
+
+                @if (insightsPanelTab() === 'xi') {
+                  <div class="two-col">
+                    <div>
+                      <div class="toolbar" style="margin-bottom: 8px;">
+                        <img class="team-logo" style="width: 28px; height: 28px;" [src]="teamMeta[selectedMatch()!.home].logoUrl" [alt]="selectedMatch()!.home" />
+                        <strong>{{ selectedMatch()!.home }}</strong>
+                      </div>
+                      @for (player of insights()[selectedMatch()!.id].home_probable_xi || []; track player; let idx = $index) {
+                        <div class="small-text" style="padding: 4px 0;">{{ idx + 1 }}. {{ player }}</div>
+                      }
+                    </div>
+                    <div>
+                      <div class="toolbar" style="margin-bottom: 8px;">
+                        <img class="team-logo" style="width: 28px; height: 28px;" [src]="teamMeta[selectedMatch()!.away].logoUrl" [alt]="selectedMatch()!.away" />
+                        <strong>{{ selectedMatch()!.away }}</strong>
+                      </div>
+                      @for (player of insights()[selectedMatch()!.id].away_probable_xi || []; track player; let idx = $index) {
+                        <div class="small-text" style="padding: 4px 0;">{{ idx + 1 }}. {{ player }}</div>
+                      }
+                    </div>
+                  </div>
+                }
+
+                @if (insightsPanelTab() === 'form') {
+                  <div class="stack">
+                    @for (entry of [
+                      { title: selectedMatch()!.home + ' Batsmen', text: insights()[selectedMatch()!.id].home_form_batsmen },
+                      { title: selectedMatch()!.away + ' Batsmen', text: insights()[selectedMatch()!.id].away_form_batsmen },
+                      { title: selectedMatch()!.home + ' Bowlers', text: insights()[selectedMatch()!.id].home_form_bowlers },
+                      { title: selectedMatch()!.away + ' Bowlers', text: insights()[selectedMatch()!.id].away_form_bowlers }
+                    ]; track entry.title) {
+                      @if (entry.text) {
+                        <div>
+                          <div class="section-title">{{ entry.title }}</div>
+                          <div class="small-text" style="white-space: pre-wrap; line-height: 1.5;">{{ entry.text }}</div>
+                        </div>
+                      }
+                    }
+                  </div>
+                }
+
+                @if (insightsPanelTab() === 'pitch') {
+                  <div class="stack">
+                    @for (entry of [
+                      { title: '🏟️ Pitch Report', text: insights()[selectedMatch()!.id].pitch_report },
+                      { title: '📋 Head to Head', text: insights()[selectedMatch()!.id].head_to_head },
+                      { title: '⚔️ Key Matchups', text: insights()[selectedMatch()!.id].key_matchups },
+                      { title: '🔮 Prediction', text: insights()[selectedMatch()!.id].prediction_summary }
+                    ]; track entry.title) {
+                      @if (entry.text) {
+                        <div>
+                          <div class="section-title">{{ entry.title }}</div>
+                          <div class="small-text" style="white-space: pre-wrap; line-height: 1.5;">{{ entry.text }}</div>
+                        </div>
+                      }
+                    }
+                  </div>
+                }
+              }
+            </div>
+          }
+
+          @if (results()[selectedMatch()!.id] && selectedMatchScore()) {
+            <div class="card stack">
+              <div class="success-text" style="font-size: 20px; font-weight: 800;">Your Score: {{ selectedMatchScore()!.total }} pts</div>
+              <div class="toolbar">
+                @for (entry of getSelectionBreakdownEntries(selectedMatch()!.id, selectionDraft()); track entry[0]) {
+                  <span class="chip" [class.success]="getEntryScore(entry) > 0" [class.danger]="getEntryScore(entry) <= 0">{{ entry[0] }}: {{ entry[1] }}</span>
+                }
+              </div>
+            </div>
+          }
+
+          <div class="card stack">
+            <div class="section-title">Core Predictions</div>
+            <div class="pick-grid">
+              <div>
+                <label class="label">Winning Team</label>
+                <select class="select" [ngModel]="selectionDraft().winningTeam" (ngModelChange)="updateSelectionField('winningTeam', $event)" [disabled]="getStatus(selectedMatch()!) === 'locked' || getStatus(selectedMatch()!) === 'completed'">
+                  <option value="">-- Select --</option>
+                  <option [value]="selectedMatch()!.home">{{ selectedMatch()!.home }}</option>
+                  <option [value]="selectedMatch()!.away">{{ selectedMatch()!.away }}</option>
+                </select>
+              </div>
+              <div>
+                <label class="label">Powerplay Winner</label>
+                <select class="select" [ngModel]="selectionDraft().powerplayWinner" (ngModelChange)="updateSelectionField('powerplayWinner', $event)" [disabled]="getStatus(selectedMatch()!) === 'locked' || getStatus(selectedMatch()!) === 'completed'">
+                  <option value="">-- Select --</option>
+                  <option [value]="selectedMatch()!.home">{{ selectedMatch()!.home }}</option>
+                  <option [value]="selectedMatch()!.away">{{ selectedMatch()!.away }}</option>
+                </select>
+              </div>
+              <div>
+                <label class="label">Best Batsman</label>
+                <select class="select" [ngModel]="selectionDraft().bestBatsman" (ngModelChange)="updateSelectionField('bestBatsman', $event)" [disabled]="getStatus(selectedMatch()!) === 'locked' || getStatus(selectedMatch()!) === 'completed'">
+                  <option value="">-- Select --</option>
+                  @for (player of currentMatchPlayers(); track player) {
+                    <option [value]="player">{{ player }}</option>
+                  }
+                </select>
+              </div>
+              <div>
+                <label class="label">Best Bowler</label>
+                <select class="select" [ngModel]="selectionDraft().bestBowler" (ngModelChange)="updateSelectionField('bestBowler', $event)" [disabled]="getStatus(selectedMatch()!) === 'locked' || getStatus(selectedMatch()!) === 'completed'">
+                  <option value="">-- Select --</option>
+                  @for (player of currentMatchPlayers(); track player) {
+                    <option [value]="player">{{ player }}</option>
+                  }
+                </select>
+              </div>
+            </div>
+          </div>
+
+          <div class="card stack">
+            <div class="section-title">Specialist Picks</div>
+            <div class="pick-grid">
+              <div>
+                <label class="label">Dot-Ball Bowler</label>
+                <select class="select" [ngModel]="selectionDraft().dotBallBowler" (ngModelChange)="updateSelectionField('dotBallBowler', $event)" [disabled]="getStatus(selectedMatch()!) === 'locked' || getStatus(selectedMatch()!) === 'completed'">
+                  <option value="">-- Select --</option>
+                  @for (player of currentMatchPlayers(); track player) {
+                    <option [value]="player">{{ player }}</option>
+                  }
+                </select>
+              </div>
+              <div>
+                <label class="label">Total Wickets Range</label>
+                <select class="select" [ngModel]="selectionDraft().totalWickets" (ngModelChange)="updateSelectionField('totalWickets', $event)" [disabled]="getStatus(selectedMatch()!) === 'locked' || getStatus(selectedMatch()!) === 'completed'">
+                  <option value="">-- Select --</option>
+                  @for (range of wicketRanges; track range) {
+                    <option [value]="range">{{ range }}</option>
+                  }
+                </select>
+              </div>
+              <div>
+                <label class="label">Batsman with Duck</label>
+                <select class="select" [ngModel]="selectionDraft().duckBatsman" (ngModelChange)="updateSelectionField('duckBatsman', $event)" [disabled]="getStatus(selectedMatch()!) === 'locked' || getStatus(selectedMatch()!) === 'completed'">
+                  <option value="">-- Select --</option>
+                  @for (player of currentMatchPlayers(); track player) {
+                    <option [value]="player">{{ player }}</option>
+                  }
+                </select>
+              </div>
+            </div>
+          </div>
+
+          <div class="card stack">
+            <div class="section-title">Strategy</div>
+            <div>
+              <label class="label">🔥 Double Points Category (×2 multiplier)</label>
+              <select class="select" [ngModel]="selectionDraft().doubleCategory" (ngModelChange)="updateSelectionField('doubleCategory', $event)" [disabled]="getStatus(selectedMatch()!) === 'locked' || getStatus(selectedMatch()!) === 'completed'">
+                <option value="">-- Select --</option>
+                @for (category of doubleCategories; track category) {
+                  <option [value]="category">{{ category }}</option>
+                }
+              </select>
+              <div class="small-text" style="margin-top: 6px;">Your chosen category's points will be doubled.</div>
+            </div>
+          </div>
+
+          <div class="card stack">
+            <div class="section-title">Bragging Rights 😄</div>
+            <div class="pick-grid">
+              <div>
+                <label class="label">🏆 Winning Horse</label>
+                <select class="select" [ngModel]="selectionDraft().winningHorse" (ngModelChange)="updateSelectionField('winningHorse', $event)" [disabled]="getStatus(selectedMatch()!) === 'locked' || getStatus(selectedMatch()!) === 'completed'">
+                  <option value="">-- Select --</option>
+                  @for (name of fantasyPlayers; track name) {
+                    <option [value]="name">{{ name }}</option>
+                  }
+                </select>
+              </div>
+              <div>
+                <label class="label">💀 Losing Horse</label>
+                <select class="select" [ngModel]="selectionDraft().losingHorse" (ngModelChange)="updateSelectionField('losingHorse', $event)" [disabled]="getStatus(selectedMatch()!) === 'locked' || getStatus(selectedMatch()!) === 'completed'">
+                  <option value="">-- Select --</option>
+                  @for (name of fantasyPlayers; track name) {
+                    <option [value]="name">{{ name }}</option>
+                  }
+                </select>
+              </div>
+            </div>
+            <div class="small-text">100 pts each for a correct guess!</div>
+          </div>
+
+          @if (getStatus(selectedMatch()!) === 'open' || getStatus(selectedMatch()!) === 'submitted') {
+            <div class="button-row">
+              <button class="button primary" (click)="saveSelection()" [disabled]="selectionSaving()">
+                {{ selectionSaving() ? 'Saving...' : hasUserSelection(selectedMatch()!.id) ? 'Update Selections' : 'Save Selections' }}
+              </button>
+              @if (selectionSavedMessage()) {
+                <span class="success-text">{{ selectionSavedMessage() }}</span>
+              }
+            </div>
+          }
+        </section>
+      } @else if (activeTab() === 'matches') {
+        <section class="page stack">
+          <div class="toolbar" style="justify-content: space-between; align-items: flex-start;">
+            <div>
+              <h1 class="heading">Matches</h1>
+              <p class="section-subtitle">IPL 2026 · 70 matches</p>
+            </div>
+            <div class="tab-strip">
+              @for (filter of ['all', 'open', 'locked', 'completed']; track filter) {
+                <button class="tab-button" [class.active]="matchFilter() === filter" (click)="matchFilter.set($any(filter))">{{ filter | titlecase }}</button>
+              }
+            </div>
+          </div>
+
+          @for (match of filteredMatches(); track match.id) {
+            <div class="card match-card stack" (click)="openMatch(match)">
+              <div class="toolbar" style="justify-content: space-between;">
+                <div class="toolbar small-text">
+                  <span style="font-weight: 700;">M{{ match.id }}</span>
+                  <span>{{ match.date }} · {{ match.time_label }}</span>
+                </div>
+                <span class="status-pill {{ getStatus(match) }}">
+                  @switch (getStatus(match)) {
+                    @case ('submitted') { ✓ Submitted }
+                    @case ('completed') { ✓ Done }
+                    @case ('locked') { 🔒 Locked }
+                    @default { 🟢 Open }
+                  }
+                </span>
+              </div>
+
+              @if (isTomorrowMatch(match) && (getStatus(match) === 'open' || getStatus(match) === 'submitted')) {
+                <div>
+                  <span class="chip info">⏳ {{ getTomorrowCountdown(match) }}</span>
+                </div>
+              }
+
+              <div class="team-row">
+                <div class="team-side reverse">
+                  <div class="team-copy">
+                    <div class="team-code">{{ match.home }}</div>
+                    <div class="team-name">{{ teamMeta[match.home].name }}</div>
+                  </div>
+                  <img class="team-logo" [src]="teamMeta[match.home].logoUrl" [alt]="match.home" />
+                </div>
+
+                <div class="vs-badge">VS</div>
+
+                <div class="team-side">
+                  <img class="team-logo" [src]="teamMeta[match.away].logoUrl" [alt]="match.away" />
+                  <div class="team-copy">
+                    <div class="team-code">{{ match.away }}</div>
+                    <div class="team-name">{{ teamMeta[match.away].name }}</div>
+                  </div>
+                </div>
+              </div>
+
+              @if (results()[match.id]) {
+                <div class="centered success-text" style="padding-top: 10px; border-top: 1px solid rgba(255,255,255,0.06); font-weight: 700;">
+                  🏆 {{ results()[match.id].winningTeam }} won
+                  @if (results()[match.id].runMargin) { by {{ results()[match.id].runMargin }} runs }
+                  @if (!results()[match.id].runMargin && results()[match.id].wicketMargin) { by {{ results()[match.id].wicketMargin }} wickets }
+                </div>
+              }
+            </div>
+          }
+        </section>
+      } @else if (activeTab() === 'selections') {
+        <section class="page stack">
+          <div>
+            <h1 class="heading">Picks</h1>
+            <p class="section-subtitle">View all player selections for locked matches</p>
+          </div>
+
+          <div>
+            <label class="label">Select Match</label>
+            <select class="select" [ngModel]="picksMatchId() ?? ''" (ngModelChange)="openPicksMatch($event)">
+              <option value="">-- Select a locked match --</option>
+              @for (match of lockedMatches(); track match.id) {
+                <option [value]="match.id">M{{ match.id }}: {{ match.home }} vs {{ match.away }} — {{ match.date }}</option>
+              }
+            </select>
+          </div>
+
+          @if (picksSavedMessage()) {
+            <div class="success-text">✓ {{ picksSavedMessage() }}</div>
+          }
+
+          @if (picksMatch()) {
+            <div class="blue-text">📋 {{ submittedPlayersForPicksMatch().length }}/{{ fantasyPlayers.length }} players submitted for M{{ picksMatch()!.id }}: {{ picksMatch()!.home }} vs {{ picksMatch()!.away }}</div>
+
+            <div class="table-wrap">
+              <table class="table">
+                <thead>
+                  <tr>
+                    <th class="sticky">Player</th>
+                    @for (col of pickColumns; track col.key) {
+                      <th>{{ col.label }}</th>
+                    }
+                  </tr>
+                </thead>
+                <tbody>
+                  @for (player of fantasyPlayers; track player) {
+                    @let savedPick = selections()[player.toLowerCase().replaceAll(' ', '_')]?.[picksMatch()!.id];
+                    <tr>
+                      <td class="sticky">
+                        {{ player }}
+                        @if (savedPick) {
+                          <span class="success-text"> ✓</span>
+                        }
+                      </td>
+                      @for (col of pickColumns; track col.key) {
+                        <td>{{ savedPick?.[col.key] || '—' }}</td>
+                      }
+                    </tr>
+                  }
+                </tbody>
+              </table>
+            </div>
+          } @else {
+            <div class="card centered muted">Select a match above to view player selections</div>
+          }
+        </section>
+      } @else if (activeTab() === 'live') {
+        <section class="page stack">
+          <div>
+            <h1 class="heading">Live Match Center</h1>
+            <p class="section-subtitle">Track live scores or manually update player stats</p>
+          </div>
+
+          <div class="tab-strip">
+            <button class="tab-button" [class.active]="liveTab() === 'grid'" (click)="liveTab.set('grid')">🔴 Live Leaderboard</button>
+            <button class="tab-button" [class.active]="liveTab() === 'update'" (click)="liveTab.set('update')">✏️ Update Player Stats</button>
+          </div>
+
+          <div>
+            <label class="label">Select Match</label>
+            <select class="select" [ngModel]="liveUpdateMatchId() ?? ''" (ngModelChange)="openLiveUpdateMatch($event)" style="max-width: 400px;">
+              <option value="">-- Select a match --</option>
+              @for (match of lockedMatches(); track match.id) {
+                <option [value]="match.id">M{{ match.id }}: {{ match.home }} vs {{ match.away }} — {{ match.date }}</option>
+              }
+            </select>
+          </div>
+
+          @if (liveSavedMessage()) {
+            <div class="success-text">{{ liveSavedMessage() }}</div>
+          }
+
+          @if (liveTab() === 'grid') {
+            @if (!liveUpdateMatchId()) {
+              <div class="card centered muted">Select a match above to view live scores</div>
+            } @else {
+              <div class="table-wrap">
+                <table class="table">
+                  <thead>
+                    <tr>
+                      <th class="sticky">Fantasy Player</th>
+                      <th class="numeric">Winning Team</th>
+                      <th class="numeric">Best Bat</th>
+                      <th class="numeric">Best Bowl</th>
+                      <th class="numeric">PP Winner</th>
+                      <th class="numeric">Dot-Ball</th>
+                      <th class="numeric">Wickets</th>
+                      <th class="numeric">Duck</th>
+                      <th class="numeric">Horses</th>
+                      <th class="numeric gold-text">Total Pts</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    @for (row of liveLeaderboardRows(); track row.name) {
+                      <tr>
+                        <td class="sticky">{{ row.name }}</td>
+                        <td class="numeric">{{ row.breakdown['winningTeam'] || 0 }}</td>
+                        <td class="numeric">{{ row.breakdown['bestBatsman'] || 0 }}</td>
+                        <td class="numeric">{{ row.breakdown['bestBowler'] || 0 }}</td>
+                        <td class="numeric">{{ row.breakdown['powerplayWinner'] || 0 }}</td>
+                        <td class="numeric">{{ row.breakdown['dotBallBowler'] || 0 }}</td>
+                        <td class="numeric">{{ row.breakdown['totalWickets'] || 0 }}</td>
+                        <td class="numeric">{{ row.breakdown['duckBatsman'] || 0 }}</td>
+                        <td class="numeric">{{ getHorsePoints(row) }}</td>
+                        <td class="numeric gold-text"><strong>{{ row.total }}</strong></td>
+                      </tr>
+                    }
+                  </tbody>
+                </table>
+              </div>
+            }
+          }
+
+          @if (liveTab() === 'update') {
+            @if (!liveUpdateMatch()) {
+              <div class="card centered muted">Select a match above to update player scores</div>
+            } @else if (uniqueLivePlayers().length === 0) {
+              <div class="card centered muted">No players were selected by fantasy managers for this match.</div>
+            } @else {
+              <div class="blue-text">📋 {{ uniqueLivePlayers().length }} unique players selected by fantasy managers.</div>
+              <div class="table-wrap">
+                <table class="table">
+                  <thead>
+                    <tr>
+                      <th class="sticky">Player</th>
+                      <th>Runs</th>
+                      <th>Fours</th>
+                      <th>Sixes</th>
+                      <th>Wickets</th>
+                      <th>Maidens</th>
+                      <th>Dot Balls</th>
+                      <th class="numeric">Batsman</th>
+                      <th class="numeric">Bowler</th>
+                      <th class="numeric">Dot Ball</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    @for (player of uniqueLivePlayers(); track player) {
+                      @let totals = calculatePlayerScoreTotals(player);
+                      <tr>
+                        <td class="sticky">{{ player }}</td>
+                        <td><input class="input" type="number" [ngModel]="liveDrafts()[player]?.runs || ''" (ngModelChange)="updateLiveDraft(player, 'runs', $event)" /></td>
+                        <td><input class="input" type="number" [ngModel]="liveDrafts()[player]?.fours || ''" (ngModelChange)="updateLiveDraft(player, 'fours', $event)" /></td>
+                        <td><input class="input" type="number" [ngModel]="liveDrafts()[player]?.sixes || ''" (ngModelChange)="updateLiveDraft(player, 'sixes', $event)" /></td>
+                        <td><input class="input" type="number" [ngModel]="liveDrafts()[player]?.wickets || ''" (ngModelChange)="updateLiveDraft(player, 'wickets', $event)" /></td>
+                        <td><input class="input" type="number" [ngModel]="liveDrafts()[player]?.maidens || ''" (ngModelChange)="updateLiveDraft(player, 'maidens', $event)" /></td>
+                        <td><input class="input" type="number" [ngModel]="liveDrafts()[player]?.dot_balls || ''" (ngModelChange)="updateLiveDraft(player, 'dot_balls', $event)" /></td>
+                        <td class="numeric gold-text">{{ totals.batsmanScore }}</td>
+                        <td class="numeric blue-text">{{ totals.bowlerScore }}</td>
+                        <td class="numeric success-text">{{ totals.dotBallScore }}</td>
+                      </tr>
+                    }
+                  </tbody>
+                </table>
+              </div>
+              <div>
+                <button class="button primary" (click)="saveLiveScores()" [disabled]="liveSaving()">{{ liveSaving() ? 'Saving...' : 'Save Player Scores' }}</button>
+              </div>
+            }
+          }
+        </section>
+      } @else if (activeTab() === 'leaderboard') {
+        <section class="page stack">
+          <div>
+            <h1 class="heading">Leaderboard & Stats</h1>
+            <p class="section-subtitle">Season standings and historical data</p>
+          </div>
+
+          <div class="tab-strip">
+            <button class="tab-button" [class.active]="leaderboardTab() === 'board'" (click)="leaderboardTab.set('board')">🏆 Overall Leaderboard</button>
+            <button class="tab-button" [class.active]="leaderboardTab() === 'consolidated'" (click)="leaderboardTab.set('consolidated')">📈 Consolidated Score</button>
+            <button class="tab-button" [class.active]="leaderboardTab() === 'stats'" (click)="leaderboardTab.set('stats')">📊 My Performance</button>
+          </div>
+
+          @if (leaderboardTab() === 'board') {
+            <div class="small-text">{{ lockedMatches().length }} matches actively scored</div>
+            <div class="summary-grid">
+              @for (entry of overallLeaderboard().slice(0, 3); track entry.name; let idx = $index) {
+                <div class="card centered rank-card">
+                  <div style="font-size: 28px; margin-bottom: 6px;">{{ ['🥇', '🥈', '🥉'][idx] }}</div>
+                  <div style="font-weight: 700; margin-bottom: 4px;">{{ entry.name }}</div>
+                  <div class="small-text">{{ entry.matchCount }} matches</div>
+                  <div class="kpi-value gold-text">{{ entry.total }}</div>
+                  <div class="small-text">POINTS</div>
+                </div>
+              }
+            </div>
+
+            <div class="card stack">
+              @for (entry of overallLeaderboard().slice(3); track entry.name; let idx = $index) {
+                <div class="stack" style="gap: 6px;">
+                  <div class="toolbar" style="justify-content: space-between;">
+                    <div class="toolbar"><strong>#{{ idx + 4 }}</strong><span>{{ entry.name }}</span></div>
+                    <strong class="gold-text">{{ entry.total }}</strong>
+                  </div>
+                  <div class="progress-track">
+                    <div class="progress-fill" [style.width.%]="overallLeaderboard()[0]?.total ? (entry.total / overallLeaderboard()[0].total) * 100 : 0"></div>
+                  </div>
+                </div>
+              }
+            </div>
+          }
+
+          @if (leaderboardTab() === 'consolidated') {
+            <div class="stack">
+              <div class="table-wrap">
+                <table class="table">
+                  <thead>
+                    <tr>
+                      <th class="sticky">Player</th>
+                      <th class="numeric gold-text">Total Pts</th>
+                      @for (match of consolidated().lockedMatches; track match.id) {
+                        <th class="numeric">M{{ match.id }}</th>
+                      }
+                    </tr>
+                  </thead>
+                  <tbody>
+                    @for (player of fantasyPlayers; track player) {
+                      <tr>
+                        <td class="sticky">{{ player }}</td>
+                        <td class="numeric gold-text">{{ consolidated().totalPoints[player] }}</td>
+                        @for (match of consolidated().lockedMatches; track match.id) {
+                          <td class="numeric">{{ consolidated().pointsByPlayer[player][match.id] || 0 }}</td>
+                        }
+                      </tr>
+                    }
+                  </tbody>
+                </table>
+              </div>
+
+              <div class="table-wrap">
+                <table class="table">
+                  <thead>
+                    <tr>
+                      <th class="sticky">Player</th>
+                      <th class="numeric gold-text">Total $</th>
+                      @for (match of consolidated().lockedMatches; track match.id) {
+                        <th class="numeric">M{{ match.id }}</th>
+                      }
+                    </tr>
+                  </thead>
+                  <tbody>
+                    @for (player of fantasyPlayers; track player) {
+                      <tr>
+                        <td class="sticky">{{ player }}</td>
+                        <td class="numeric gold-text">{{ consolidated().totalWinnings[player] }}</td>
+                        @for (match of consolidated().lockedMatches; track match.id) {
+                          <td class="numeric">{{ consolidated().winningsByPlayer[player][match.id] ? '$' + consolidated().winningsByPlayer[player][match.id] : '-' }}</td>
+                        }
+                      </tr>
+                    }
+                  </tbody>
+                </table>
+              </div>
+
+              <div class="table-wrap">
+                <table class="table">
+                  <thead>
+                    <tr>
+                      <th class="sticky">Player</th>
+                      @for (match of consolidated().lockedMatches; track match.id) {
+                        <th class="numeric">M{{ match.id }}</th>
+                      }
+                    </tr>
+                  </thead>
+                  <tbody>
+                    @for (player of fantasyPlayers; track player) {
+                      <tr>
+                        <td class="sticky">{{ player }}</td>
+                        @for (match of consolidated().lockedMatches; track match.id) {
+                          <td class="numeric">{{ consolidated().ranksByPlayer[player][match.id] || '-' }}</td>
+                        }
+                      </tr>
+                    }
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          }
+
+          @if (leaderboardTab() === 'stats') {
+            <div class="small-text">Viewing stats for: <span class="gold-text" style="font-weight: 600;">{{ user()!.displayName }}</span></div>
+            <div class="metrics">
+              <div class="card centered metric-card">
+                <div style="font-size: 20px;">🎯</div>
+                <div class="kpi-value gold-text">{{ myStats().totalPoints }}</div>
+                <div class="small-text">Total Points</div>
+              </div>
+              <div class="card centered metric-card">
+                <div style="font-size: 20px;">🏏</div>
+                <div class="kpi-value blue-text">{{ myStats().lockedMatches.length }}</div>
+                <div class="small-text">Matches</div>
+              </div>
+              <div class="card centered metric-card">
+                <div style="font-size: 20px;">📈</div>
+                <div class="kpi-value success-text">{{ myStats().averagePoints }}</div>
+                <div class="small-text">Avg/Match</div>
+              </div>
+            </div>
+
+            @if (myStats().lockedMatches.length === 0) {
+              <div class="card centered muted">No active matches yet. Make your selections!</div>
+            } @else {
+              @for (match of myStats().lockedMatches; track match.id) {
+                @let score = getCurrentUserScore(match.id);
+                <div class="card stack">
+                  <div class="toolbar" style="justify-content: space-between;">
+                    <div class="toolbar">
+                      <span class="muted" style="font-weight: 700; width: 32px;">M{{ match.id }}</span>
+                      <img class="team-logo" style="width: 36px; height: 36px;" [src]="teamMeta[match.home].logoUrl" [alt]="match.home" />
+                      <strong>{{ match.home }}</strong>
+                      <span class="muted">vs</span>
+                      <img class="team-logo" style="width: 36px; height: 36px;" [src]="teamMeta[match.away].logoUrl" [alt]="match.away" />
+                      <strong>{{ match.away }}</strong>
+                    </div>
+                    <div class="kpi-value gold-text">{{ score.total }} pts</div>
+                  </div>
+                  <div class="toolbar">
+                    @for (entry of getSelectionBreakdownEntries(match.id, currentUserSelections()[match.id]); track entry[0]) {
+                      <span class="chip" [class.success]="getEntryScore(entry) > 0" [class.danger]="getEntryScore(entry) <= 0">{{ entry[0] }}: {{ entry[1] }}</span>
+                    }
+                  </div>
+                </div>
+              }
+            }
+          }
+        </section>
+      } @else if (activeTab() === 'admin' && user()!.isAdmin) {
+        <section class="page stack">
+          <h1 class="heading">Admin Panel</h1>
+          <div class="tab-strip">
+            <button class="tab-button" [class.active]="adminTab() === 'results'" (click)="adminTab.set('results')">Match Results</button>
+            <button class="tab-button" [class.active]="adminTab() === 'scores'" (click)="adminTab.set('scores')">Player Scores</button>
+            <button class="tab-button" [class.active]="adminTab() === 'selections'" (click)="adminTab.set('selections')">Player Selections</button>
+            <button class="tab-button" [class.active]="adminTab() === 'insights'" (click)="adminTab.set('insights')">AI Insights</button>
+            <button class="tab-button" [class.active]="adminTab() === 'users'" (click)="adminTab.set('users')">Player Passwords</button>
+          </div>
+
+          @if (adminTab() === 'scores') {
+            <div class="small-text">Use the Live tab to update player score inputs and live leaderboard views.</div>
+          }
+
+          @if (adminTab() === 'selections') {
+            <div>
+              <label class="label">Select Match</label>
+              <select class="select" [ngModel]="picksMatchId() ?? ''" (ngModelChange)="openPicksMatch($event)">
+                <option value="">-- Select a locked match --</option>
+                @for (match of lockedMatches(); track match.id) {
+                  <option [value]="match.id">M{{ match.id }}: {{ match.home }} vs {{ match.away }} — {{ match.date }}</option>
+                }
+              </select>
+            </div>
+
+            @if (picksSavedMessage()) {
+              <div class="success-text">✓ {{ picksSavedMessage() }}</div>
+            }
+
+            @if (picksMatch()) {
+              <div class="table-wrap">
+                <table class="table">
+                  <thead>
+                    <tr>
+                      <th class="sticky">Player</th>
+                      @for (col of pickColumns; track col.key) {
+                        <th>{{ col.label }}</th>
+                      }
+                      <th>Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    @for (player of fantasyPlayers; track player) {
+                      @let savedPick = selections()[player.toLowerCase().replaceAll(' ', '_')]?.[picksMatch()!.id];
+                      <tr>
+                        <td class="sticky">{{ player }}</td>
+                        @for (col of pickColumns; track col.key) {
+                          <td>
+                            @if (picksEditingPlayer() === player) {
+                              <select class="select" [ngModel]="picksDraft()[col.key]" (ngModelChange)="updatePicksDraft(col.key, $event)">
+                                <option value="">--</option>
+                                @for (option of getPickOptions(col.type, picksMatch()); track option) {
+                                  <option [value]="option">{{ option }}</option>
+                                }
+                              </select>
+                            } @else {
+                              {{ savedPick?.[col.key] || '—' }}
+                            }
+                          </td>
+                        }
+                        <td>
+                          @if (picksEditingPlayer() === player) {
+                            <div class="toolbar">
+                              <button class="button primary" style="padding: 6px 10px;" (click)="saveAdminPick(player)" [disabled]="picksSaving()">{{ picksSaving() ? '...' : 'Save' }}</button>
+                              <button class="button ghost" style="padding: 6px 10px;" (click)="cancelEditPick()">Cancel</button>
+                            </div>
+                          } @else {
+                            <button class="button ghost" style="padding: 6px 10px;" (click)="editPick(player)">Edit</button>
+                          }
+                        </td>
+                      </tr>
+                    }
+                  </tbody>
+                </table>
+              </div>
+            }
+          }
+
+          @if (adminTab() === 'insights') {
+            <div class="card stack">
+              <div class="section-title" style="font-size: 18px;">Manual AI Insights Update</div>
+              <p class="small-text" style="line-height: 1.5;">This triggers the AI to generate or refresh insights for matches scheduled within the next 24 hours.</p>
+              <div class="toolbar">
+                <button class="button primary" (click)="runInsightsUpdate()" [disabled]="insightsUpdating()">
+                  {{ insightsUpdating() ? '🔄 Updating AI Insights...' : '🚀 Trigger Today\'s Updates' }}
+                </button>
+                @if (insightsUpdating()) {
+                  <span class="warning-text">Waiting for AI response...</span>
+                }
+              </div>
+              @if (insightsUpdateError()) {
+                <div class="danger-text">❌ {{ insightsUpdateError() }}</div>
+              }
+              @if (insightsUpdateResult()) {
+                <div class="success-text">✅ Update complete</div>
+                <pre class="card" style="white-space: pre-wrap; overflow: auto;">{{ insightsUpdateResult() | json }}</pre>
+              }
+            </div>
+          }
+
+          @if (adminTab() === 'users') {
+            @if (passwordResetInfo()) {
+              <div class="card success-text">✓ Reset for <strong>{{ passwordResetInfo()!.username }}</strong> → <strong class="gold-text">{{ passwordResetInfo()!.newPwd }}</strong></div>
+            }
+            @if (usersLoading()) {
+              <div class="muted">Loading players...</div>
+            } @else {
+              <div class="table-wrap">
+                <table class="table">
+                  <thead>
+                    <tr>
+                      <th>Player</th>
+                      <th>Username</th>
+                      <th>Password</th>
+                      <th>Action</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    @for (entry of users(); track entry.username) {
+                      <tr>
+                        <td>{{ entry.display_name }}</td>
+                        <td>{{ entry.username }}</td>
+                        <td class="gold-text">{{ entry.password }}</td>
+                        <td><button class="button ghost" style="padding: 6px 10px;" (click)="resetPassword(entry.username)">Reset</button></td>
+                      </tr>
+                    }
+                  </tbody>
+                </table>
+              </div>
+            }
+          }
+
+          @if (adminTab() === 'results') {
+            <div class="two-col">
+              <div class="stack">
+                <div class="section-title">Locked / Completed Matches</div>
+                @if (lockedMatches().length === 0) {
+                  <div class="muted">No locked matches yet</div>
+                }
+                @for (match of lockedMatches(); track match.id) {
+                  <div class="card match-card" (click)="openAdminMatch(match)">
+                    <div class="toolbar" style="justify-content: space-between;">
+                      <div class="toolbar">
+                        <strong class="muted">M{{ match.id }}</strong>
+                        <img class="team-logo" style="width: 32px; height: 32px;" [src]="teamMeta[match.home].logoUrl" [alt]="match.home" />
+                        <strong>{{ match.home }}</strong>
+                        <span class="muted">vs</span>
+                        <img class="team-logo" style="width: 32px; height: 32px;" [src]="teamMeta[match.away].logoUrl" [alt]="match.away" />
+                        <strong>{{ match.away }}</strong>
+                      </div>
+                      @if (results()[match.id]) { <span class="success-text">✓</span> }
+                    </div>
+                    <div class="small-text" style="margin-left: 44px;">{{ match.date }}</div>
+                  </div>
+                }
+              </div>
+
+              <div>
+                @if (adminMatch()) {
+                  <div class="card stack">
+                    <div>
+                      <div style="font-size: 18px; font-weight: 700;">M{{ adminMatch()!.id }}: {{ adminMatch()!.home }} vs {{ adminMatch()!.away }}</div>
+                      <div class="small-text">{{ adminMatch()!.date }} · {{ adminMatch()!.time_label }}</div>
+                    </div>
+
+                    @if (adminSavedResult()) {
+                      <div class="success-text">✓ Saved! Points calculated.</div>
+                    }
+
+                    <div class="section-title">Match Result</div>
+                    <div class="form-grid">
+                      <div>
+                        <label class="label">Winning Team</label>
+                        <select class="select" [ngModel]="adminResultDraft().winningTeam" (ngModelChange)="updateAdminResult('winningTeam', $event)">
+                          <option value="">-- Select --</option>
+                          <option [value]="adminMatch()!.home">{{ adminMatch()!.home }}</option>
+                          <option [value]="adminMatch()!.away">{{ adminMatch()!.away }}</option>
+                        </select>
+                      </div>
+                      <div>
+                        <label class="label">Win Type</label>
+                        <select class="select" [ngModel]="adminResultDraft().winByRuns ? 'runs' : 'wickets'" (ngModelChange)="updateAdminResult('winByRuns', $event === 'runs')">
+                          <option value="runs">By Runs</option>
+                          <option value="wickets">By Wickets</option>
+                        </select>
+                      </div>
+                      <div>
+                        <label class="label">Run Margin</label>
+                        <input class="input" type="number" [ngModel]="adminResultDraft().runMargin" (ngModelChange)="updateAdminResult('runMargin', +$event)" />
+                      </div>
+                      <div>
+                        <label class="label">Wicket Margin</label>
+                        <input class="input" type="number" [ngModel]="adminResultDraft().wicketMargin" (ngModelChange)="updateAdminResult('wicketMargin', +$event)" />
+                      </div>
+                    </div>
+
+                    <div class="section-title">Batting</div>
+                    <div class="form-grid">
+                      <div>
+                        <label class="label">Top Scorer</label>
+                        <select class="select" [ngModel]="adminResultDraft().topScorer" (ngModelChange)="updateAdminResult('topScorer', $event)">
+                          <option value="">-- Select --</option>
+                          @for (player of getUniquePlayers(adminMatch()!); track player) {
+                            <option [value]="player">{{ player }}</option>
+                          }
+                        </select>
+                      </div>
+                      <div>
+                        <label class="label">Runs Scored</label>
+                        <input class="input" type="number" [ngModel]="adminResultDraft().topScorerRuns" (ngModelChange)="updateAdminResult('topScorerRuns', +$event)" />
+                      </div>
+                    </div>
+
+                    <div>
+                      <label class="label">Duck Batsmen</label>
+                      <div class="toolbar">
+                        <select class="select" [ngModel]="adminDuckCandidate()" (ngModelChange)="adminDuckCandidate.set($event)">
+                          <option value="">-- Select Player --</option>
+                          @for (player of availableDuckPlayers(); track player) {
+                            <option [value]="player">{{ player }}</option>
+                          }
+                        </select>
+                        <button class="button primary" (click)="addDuckPlayer()">+ Add</button>
+                      </div>
+                      <div class="toolbar" style="margin-top: 8px;">
+                        @for (player of adminResultDraft().duckBatsmen; track player) {
+                          <span class="chip warn">{{ player }} <button class="tab-button" (click)="removeDuckPlayer(player)">✕</button></span>
+                        }
+                      </div>
+                    </div>
+
+                    <div class="section-title">Bowling</div>
+                    <div class="form-grid">
+                      <div>
+                        <label class="label">Best Bowler</label>
+                        <select class="select" [ngModel]="adminResultDraft().bestBowler" (ngModelChange)="updateAdminResult('bestBowler', $event)">
+                          <option value="">-- Select --</option>
+                          @for (player of getUniquePlayers(adminMatch()!); track player) {
+                            <option [value]="player">{{ player }}</option>
+                          }
+                        </select>
+                      </div>
+                      <div>
+                        <label class="label">Bowler Points</label>
+                        <input class="input" type="number" [ngModel]="adminResultDraft().bestBowlerPoints" (ngModelChange)="updateAdminResult('bestBowlerPoints', +$event)" />
+                      </div>
+                      <div>
+                        <label class="label">Dot-Ball Leader</label>
+                        <select class="select" [ngModel]="adminResultDraft().dotBallLeader" (ngModelChange)="updateAdminResult('dotBallLeader', $event)">
+                          <option value="">-- Select --</option>
+                          @for (player of getUniquePlayers(adminMatch()!); track player) {
+                            <option [value]="player">{{ player }}</option>
+                          }
+                        </select>
+                      </div>
+                      <div>
+                        <label class="label">Dot Balls Bowled</label>
+                        <input class="input" type="number" [ngModel]="adminResultDraft().dotBalls" (ngModelChange)="updateAdminResult('dotBalls', +$event)" />
+                      </div>
+                    </div>
+
+                    <div class="section-title">Powerplay & Wickets</div>
+                    <div class="form-grid">
+                      <div>
+                        <label class="label">Powerplay Winner</label>
+                        <select class="select" [ngModel]="adminResultDraft().powerplayWinner" (ngModelChange)="updateAdminResult('powerplayWinner', $event)">
+                          <option value="">-- Select --</option>
+                          <option [value]="adminMatch()!.home">{{ adminMatch()!.home }}</option>
+                          <option [value]="adminMatch()!.away">{{ adminMatch()!.away }}</option>
+                        </select>
+                      </div>
+                      <div>
+                        <label class="label">Powerplay Score</label>
+                        <input class="input" type="number" [ngModel]="adminResultDraft().powerplayScore" (ngModelChange)="updateAdminResult('powerplayScore', +$event)" />
+                      </div>
+                      <div>
+                        <label class="label">Powerplay Diff</label>
+                        <input class="input" type="number" [ngModel]="adminResultDraft().powerplayDiff" (ngModelChange)="updateAdminResult('powerplayDiff', +$event)" />
+                      </div>
+                      <div>
+                        <label class="label">Total Wickets Fallen</label>
+                        <input class="input" type="number" [ngModel]="adminResultDraft().totalWickets" (ngModelChange)="updateAdminResult('totalWickets', +$event)" />
+                      </div>
+                      <div>
+                        <label class="label">Wickets Range</label>
+                        <select class="select" [ngModel]="adminResultDraft().wicketsRange" (ngModelChange)="updateAdminResult('wicketsRange', $event)">
+                          <option value="">-- Select --</option>
+                          @for (range of wicketRanges; track range) {
+                            <option [value]="range">{{ range }}</option>
+                          }
+                        </select>
+                      </div>
+                    </div>
+
+                    <div class="section-title">Horse Results</div>
+                    <div class="form-grid">
+                      <div>
+                        <label class="label">🏆 Match Top Scorer</label>
+                        <select class="select" [ngModel]="adminResultDraft().matchTopPlayer" (ngModelChange)="updateAdminResult('matchTopPlayer', $event)">
+                          <option value="">-- Select --</option>
+                          @for (player of fantasyPlayers; track player) {
+                            <option [value]="player">{{ player }}</option>
+                          }
+                        </select>
+                      </div>
+                      <div>
+                        <label class="label">💀 Match Bottom Scorer</label>
+                        <select class="select" [ngModel]="adminResultDraft().matchBottomPlayer" (ngModelChange)="updateAdminResult('matchBottomPlayer', $event)">
+                          <option value="">-- Select --</option>
+                          @for (player of fantasyPlayers; track player) {
+                            <option [value]="player">{{ player }}</option>
+                          }
+                        </select>
+                      </div>
+                    </div>
+
+                    <div>
+                      <button class="button primary" (click)="saveAdminResult()" [disabled]="adminSavingResult()">{{ adminSavingResult() ? 'Saving...' : 'Save Result & Calculate Points' }}</button>
+                    </div>
+                  </div>
+                } @else {
+                  <div class="card centered muted">Select a match to enter results</div>
+                }
+              </div>
+            </div>
+          }
+        </section>
+      }
+    </div>
+
+    <nav class="bottom-nav">
+      @for (tab of mainTabs(); track tab.id) {
+        <button [class.active]="activeTab() === tab.id && !selectedMatch()" (click)="setActiveTab(tab.id)">
+          <div class="nav-item">
+            <span style="font-size: 24px; line-height: 1;">{{ tab.icon }}</span>
+            <span style="font-size: 12px; font-weight: 600;">{{ tab.label }}</span>
+          </div>
+        </button>
+      }
+    </nav>
+  </div>
+}

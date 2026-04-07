@@ -1,0 +1,15 @@
+# Root repository ignores
+.DS_Store
+Thumbs.db
+
+# Angular app artifacts
+ipl-fantasy/node_modules/
+ipl-fantasy/dist/
+ipl-fantasy/.angular/
+ipl-fantasy/coverage/
+ipl-fantasy/tmp/
+ipl-fantasy/out-tsc/
+
+# Logs
+npm-debug.log*
+yarn-error.log*

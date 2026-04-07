@@ -1,0 +1,13 @@
+https://ipl-fantasy-2026-xi.vercel.app/logos/CSK.png
+https://ipl-fantasy-2026-xi.vercel.app/logos/DC.png
+https://ipl-fantasy-2026-xi.vercel.app/logos/GT.png
+https://ipl-fantasy-2026-xi.vercel.app/logos/KKR.png
+https://ipl-fantasy-2026-xi.vercel.app/logos/LSG.png
+https://ipl-fantasy-2026-xi.vercel.app/logos/MI.png
+https://ipl-fantasy-2026-xi.vercel.app/logos/PBKS.png
+https://ipl-fantasy-2026-xi.vercel.app/logos/RCB.png
+https://ipl-fantasy-2026-xi.vercel.app/logos/RR.png
+https://ipl-fantasy-2026-xi.vercel.app/logos/SRH.png
+
+
+https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap
