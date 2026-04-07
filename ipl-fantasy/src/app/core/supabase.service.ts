@@ -23,7 +23,7 @@ export class SupabaseService {
     }
 
     const response = await fetch(url, { headers: this.headers() });
-    return response.json();
+    return this.readResponse<T[]>(response);
   }
 
   async upsert<T>(table: string, payload: unknown, onConflict: string): Promise<T[]> {
@@ -37,7 +37,7 @@ export class SupabaseService {
       body: JSON.stringify(payload),
     });
 
-    return response.json();
+    return this.readResponse<T[]>(response);
   }
 
   async update<T>(table: string, payload: unknown, filters: Record<string, string | number>): Promise<T[]> {
@@ -56,7 +56,22 @@ export class SupabaseService {
       body: JSON.stringify(payload),
     });
 
-    return response.json();
+    return this.readResponse<T[]>(response);
+  }
+
+  private async readResponse<T>(response: Response): Promise<T> {
+    if (response.ok) {
+      return (await response.json()) as T;
+    }
+
+    let detail = response.statusText;
+
+    try {
+      const errorBody = await response.json();
+      detail = errorBody?.message || errorBody?.error_description || errorBody?.hint || response.statusText;
+    } catch {}
+
+    throw new Error(`Supabase request failed (${response.status}): ${detail}`);
   }
 
   private headers(): HeadersInit {

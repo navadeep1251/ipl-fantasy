@@ -13,10 +13,14 @@ import {
   SessionUser,
 } from './models';
 import { SQLiteService } from './sqlite.service';
+import { SupabaseService } from './supabase.service';
 
 @Injectable({ providedIn: 'root' })
 export class DataService {
-  constructor(private readonly sqlite: SQLiteService) {}
+  constructor(
+    private readonly sqlite: SQLiteService,
+    private readonly supabase: SupabaseService,
+  ) {}
 
   async login(username: string, password: string): Promise<SessionUser> {
     const users = await this.sqlite.all<ArrayUserRow>('SELECT * FROM users WHERE username = ?', [username.toLowerCase().trim()]);
@@ -39,22 +43,14 @@ export class DataService {
 
   async loadDashboard() {
     const [matchRows, resultsRows, selectionsRows, insightsRows, playerScoreRows] = await Promise.all([
-      this.sqlite.all<MatchRow>('SELECT * FROM matches ORDER BY id ASC'),
+      this.loadMatches(),
       this.sqlite.all<ResultRow>('SELECT * FROM results'),
       this.sqlite.all<SelectionRow>('SELECT * FROM selections'),
       this.sqlite.all<InsightRow>('SELECT * FROM match_insights').catch(() => []),
       this.sqlite.all<PlayerScore>('SELECT * FROM player_scores').catch(() => []),
     ]);
 
-    const matches: MatchRecord[] = (matchRows || []).map((row) => ({
-      id: row.id,
-      home: row.home,
-      away: row.away,
-      date: row.date,
-      time_label: row.time_label,
-      lock_time: row.lock_time,
-      manual_lock_state: row.manual_lock_state ?? null,
-    }));
+    const matches: MatchRecord[] = matchRows || [];
 
     const results: ResultMap = {};
     for (const row of resultsRows || []) {
@@ -127,6 +123,48 @@ export class DataService {
       insights,
       playerScores,
     };
+  }
+
+  async loadMatches(): Promise<MatchRecord[]> {
+    const fallbackMatches = await this.sqlite.all<MatchRow>('SELECT * FROM matches ORDER BY id ASC');
+
+    try {
+      const remoteMatches = await this.supabase.query<MatchRow>('matches', {
+        select: 'id,home,away,date,time_label,lock_time,manual_lock_state',
+        order: 'id.asc',
+      });
+
+      if (!remoteMatches?.length) {
+        return fallbackMatches.map(this.mapMatchRow);
+      }
+
+      await this.sqlite.batch(
+        remoteMatches.map((match) => ({
+          sql: `INSERT INTO matches (id, home, away, date, time_label, lock_time, manual_lock_state)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
+            ON CONFLICT(id) DO UPDATE SET
+              home = excluded.home,
+              away = excluded.away,
+              date = excluded.date,
+              time_label = excluded.time_label,
+              lock_time = excluded.lock_time,
+              manual_lock_state = excluded.manual_lock_state`,
+          params: [
+            match.id,
+            match.home,
+            match.away,
+            match.date,
+            match.time_label,
+            match.lock_time,
+            match.manual_lock_state ?? null,
+          ],
+        })),
+      );
+
+      return remoteMatches.map(this.mapMatchRow);
+    } catch {
+      return fallbackMatches.map(this.mapMatchRow);
+    }
   }
 
   async saveUserSelection(user: SessionUser, matchId: number, selection: SelectionRecord): Promise<void> {
@@ -231,6 +269,7 @@ export class DataService {
   }
 
   async setMatchManualLockState(matchId: number, manualLockState: number | null): Promise<void> {
+    await this.supabase.update('matches', { manual_lock_state: manualLockState }, { id: matchId });
     await this.sqlite.run('UPDATE matches SET manual_lock_state = ? WHERE id = ?', [manualLockState, matchId]);
   }
 
@@ -273,6 +312,18 @@ export class DataService {
         new Date().toISOString(),
       ],
     );
+  }
+
+  private mapMatchRow(row: MatchRow): MatchRecord {
+    return {
+      id: row.id,
+      home: row.home,
+      away: row.away,
+      date: row.date,
+      time_label: row.time_label,
+      lock_time: row.lock_time,
+      manual_lock_state: row.manual_lock_state ?? null,
+    };
   }
 }
 

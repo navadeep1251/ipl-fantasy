@@ -52,6 +52,7 @@ interface UserRow {
 export class FantasyDashboardComponent {
   private readonly dataService = inject(DataService);
   private readonly clockInterval = window.setInterval(() => this.now.set(new Date()), 30_000);
+  private readonly matchRefreshInterval = window.setInterval(() => void this.refreshMatches(), 15_000);
 
   readonly teamMeta = TEAM_META;
   readonly fantasyPlayers = FANTASY_PLAYERS;
@@ -278,6 +279,7 @@ export class FantasyDashboardComponent {
 
   ngOnDestroy(): void {
     window.clearInterval(this.clockInterval);
+    window.clearInterval(this.matchRefreshInterval);
   }
 
   async login() {
@@ -319,6 +321,16 @@ export class FantasyDashboardComponent {
     } finally {
       this.loading.set(false);
     }
+  }
+
+  async refreshMatches() {
+    if (!this.user()) {
+      return;
+    }
+
+    try {
+      this.matches.set(await this.dataService.loadMatches());
+    } catch {}
   }
 
   setActiveTab(tab: MainTab) {
