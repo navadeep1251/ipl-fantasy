@@ -169,7 +169,7 @@ export class FantasyDashboardComponent {
   readonly lockedMatches = computed(() => this.matches().filter((match) => !!this.results()[match.id] || isMatchLocked(match, this.now())));
   readonly picksVisibleMatches = computed(() => {
     const now = this.now();
-    const windowEnd = now.getTime() + 48 * 60 * 60 * 1000;
+    const windowEnd = now.getTime();
     const visible = new Map<number, MatchRecord>();
     this.lockedMatches().forEach((match) => visible.set(match.id, match));
     this.matches()
