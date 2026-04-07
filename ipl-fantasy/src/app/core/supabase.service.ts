@@ -1,9 +1,19 @@
 import { Injectable } from '@angular/core';
+import { createClient, RealtimeChannel, RealtimePostgresChangesPayload, SupabaseClient } from '@supabase/supabase-js';
+import { environment } from '../../environments/environment';
+
+export type SupabaseSyncState = 'connecting' | 'live' | 'offline';
 
 @Injectable({ providedIn: 'root' })
 export class SupabaseService {
-  private readonly baseUrl = 'https://olewyqrxgwjjjspeonon.supabase.co';
-  private readonly anonKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9sZXd5cXJ4Z3dqampzcGVvbm9uIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQ3MzM3NjMsImV4cCI6MjA5MDMwOTc2M30.mbY5GR8eZu7BH1UD0Yq2B_l5dr4bPB-RkYXa-vgRwYI';
+  private readonly baseUrl = environment.supabaseUrl;
+  private readonly anonKey = environment.supabaseKey;
+  private readonly client: SupabaseClient = createClient(this.baseUrl, this.anonKey, {
+    auth: {
+      persistSession: false,
+      autoRefreshToken: false,
+    },
+  });
 
   async query<T>(table: string, options: { select?: string; eq?: Record<string, string | number>; order?: string } = {}): Promise<T[]> {
     let url = `${this.baseUrl}/rest/v1/${table}?`;
@@ -57,6 +67,38 @@ export class SupabaseService {
     });
 
     return this.readResponse<T[]>(response);
+  }
+
+  subscribeToSharedChanges(options: {
+    onChange: (payload: RealtimePostgresChangesPayload<Record<string, unknown>>) => void;
+    onStatus?: (status: SupabaseSyncState) => void;
+  }): () => void {
+    const channel = this.client.channel(`ipl-fantasy-live-${Date.now()}`);
+    const tables = ['matches', 'results', 'selections', 'player_scores', 'match_insights', 'users'];
+
+    tables.forEach((table) => {
+      channel.on('postgres_changes', { event: '*', schema: 'public', table }, (payload) => options.onChange(payload));
+    });
+
+    options.onStatus?.('connecting');
+    channel.subscribe((status) => {
+      if (status === 'SUBSCRIBED') {
+        options.onStatus?.('live');
+        return;
+      }
+
+      if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT' || status === 'CLOSED') {
+        options.onStatus?.('offline');
+        return;
+      }
+
+      options.onStatus?.('connecting');
+    });
+
+    return () => {
+      options.onStatus?.('offline');
+      void this.client.removeChannel(channel);
+    };
   }
 
   private async readResponse<T>(response: Response): Promise<T> {

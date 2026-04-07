@@ -51,6 +51,7 @@
       <header class="header">
         <div class="logo">🏏 IPL FANTASY</div>
         <div class="toolbar">
+          <span class="sync-pill {{ syncBadgeClass() }}">{{ syncBadgeLabel() }}</span>
           <span class="small-text">{{ user()!.displayName }}</span>
           <button class="button danger" style="padding: 6px 12px;" (click)="logout()">Logout</button>
         </div>

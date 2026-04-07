@@ -34,6 +34,7 @@ import {
   SelectionRecord,
   SessionUser,
 } from '../core/models';
+import { SupabaseService, SupabaseSyncState } from '../core/supabase.service';
 
 interface UserRow {
   username: string;
@@ -51,8 +52,9 @@ interface UserRow {
 })
 export class FantasyDashboardComponent {
   private readonly dataService = inject(DataService);
+  private readonly supabaseService = inject(SupabaseService);
   private readonly clockInterval = window.setInterval(() => this.now.set(new Date()), 30_000);
-  private readonly matchRefreshInterval = window.setInterval(() => void this.refreshMatches(), 15_000);
+  private readonly sharedRefreshInterval = window.setInterval(() => void this.refreshSharedData(), 15_000);
 
   readonly teamMeta = TEAM_META;
   readonly fantasyPlayers = FANTASY_PLAYERS;
@@ -84,6 +86,8 @@ export class FantasyDashboardComponent {
   readonly matchFilter = signal<MatchFilter>('all');
   readonly loading = signal(false);
   readonly now = signal(new Date());
+  readonly supabaseSyncState = signal<SupabaseSyncState>('connecting');
+  readonly supabaseSyncMessage = signal('Connecting to live sync...');
 
   readonly matches = signal<MatchRecord[]>([]);
   readonly results = signal<Record<number, MatchResult>>({});
@@ -270,6 +274,24 @@ export class FantasyDashboardComponent {
       }
     });
 
+    effect((onCleanup) => {
+      const currentUser = this.user();
+      if (!currentUser) {
+        this.setSyncState('offline');
+        return;
+      }
+
+      this.setSyncState('connecting');
+      const unsubscribe = this.supabaseService.subscribeToSharedChanges({
+        onChange: () => void this.refreshSharedData(),
+        onStatus: (status) => this.setSyncState(status),
+      });
+
+      onCleanup(() => {
+        unsubscribe();
+      });
+    });
+
     effect(() => {
       if (this.adminTab() === 'users' && this.user()?.isAdmin && this.users().length === 0 && !this.usersLoading()) {
         this.loadUsers();
@@ -279,7 +301,7 @@ export class FantasyDashboardComponent {
 
   ngOnDestroy(): void {
     window.clearInterval(this.clockInterval);
-    window.clearInterval(this.matchRefreshInterval);
+    window.clearInterval(this.sharedRefreshInterval);
   }
 
   async login() {
@@ -307,30 +329,37 @@ export class FantasyDashboardComponent {
     this.user.set(null);
     this.activeTab.set('matches');
     this.selectedMatchId.set(null);
+    this.setSyncState('offline');
   }
 
   async loadDashboard() {
     this.loading.set(true);
     try {
-      const dashboard = await this.dataService.loadDashboard();
-      this.matches.set(dashboard.matches);
-      this.results.set(dashboard.results);
-      this.selections.set(dashboard.selections);
-      this.insights.set(dashboard.insights);
-      this.playerScores.set(dashboard.playerScores);
+      this.applyDashboard(await this.dataService.loadDashboard());
+      if (this.user()) {
+        this.setSyncState(this.supabaseSyncState() === 'offline' ? 'offline' : 'connecting');
+      }
     } finally {
       this.loading.set(false);
     }
   }
 
-  async refreshMatches() {
+  async refreshSharedData() {
     if (!this.user()) {
       return;
     }
 
     try {
-      this.matches.set(await this.dataService.loadMatches());
+      this.applyDashboard(await this.dataService.loadDashboard());
     } catch {}
+  }
+
+  syncBadgeClass() {
+    return this.supabaseSyncState();
+  }
+
+  syncBadgeLabel() {
+    return this.supabaseSyncMessage();
   }
 
   setActiveTab(tab: MainTab) {
@@ -408,6 +437,30 @@ export class FantasyDashboardComponent {
     const manualLockState = shouldLock ? 1 : 0;
     await this.dataService.setMatchManualLockState(match.id, manualLockState);
     this.matches.update((rows) => rows.map((row) => (row.id === match.id ? { ...row, manual_lock_state: manualLockState } : row)));
+  }
+
+  private applyDashboard(dashboard: Awaited<ReturnType<DataService['loadDashboard']>>) {
+    this.matches.set(dashboard.matches);
+    this.results.set(dashboard.results);
+    this.selections.set(dashboard.selections);
+    this.insights.set(dashboard.insights);
+    this.playerScores.set(dashboard.playerScores);
+  }
+
+  private setSyncState(state: SupabaseSyncState) {
+    this.supabaseSyncState.set(state);
+
+    if (state === 'live') {
+      this.supabaseSyncMessage.set('Live sync active');
+      return;
+    }
+
+    if (state === 'connecting') {
+      this.supabaseSyncMessage.set('Connecting to live sync...');
+      return;
+    }
+
+    this.supabaseSyncMessage.set('Offline cache mode');
   }
 
   isTomorrowMatch(match: MatchRecord): boolean {
@@ -672,7 +725,7 @@ export class FantasyDashboardComponent {
     this.usersLoading.set(true);
     try {
       const rows = await this.dataService.loadUsers();
-      this.users.set(rows.filter((row) => !row.is_admin));
+      this.users.set(rows.filter((row) => !row.is_admin).map((row) => ({ ...row, is_admin: !!row.is_admin })));
     } finally {
       this.usersLoading.set(false);
     }
