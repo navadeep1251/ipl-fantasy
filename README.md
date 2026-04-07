@@ -4,9 +4,10 @@ This repository contains the Angular recreation of the IPL fantasy app, along wi
 
 ## Structure
 
-- `ipl-fantasy/` — Angular application source, build scripts, and GitHub Pages workflow
+- `ipl-fantasy/` — Angular application source and build scripts
 - `reference/ipl.js` — original JavaScript bundle that was reverse-engineered
 - `reference/SRC.txt` — reference asset links used by the UI
+- `.github/workflows/deploy-pages.yml` — repo-level GitHub Pages workflow
 
 ## Quick start
 
@@ -25,14 +26,14 @@ npm run build
 
 ## GitHub Pages
 
-The Angular app already includes a GitHub Pages workflow in `ipl-fantasy/.github/workflows/deploy-pages.yml`.
+This repository is configured for GitHub Pages using the repo-level workflow in `.github/workflows/deploy-pages.yml`.
 
 To publish:
 
-1. Create a new GitHub repository.
-2. Push this workspace to the `main` branch.
-3. In GitHub, open **Settings → Pages** and set **Source** to **GitHub Actions**.
-4. Push future changes to `main` to trigger deployment.
+1. Push this workspace to the `main` branch.
+2. In GitHub, open **Settings → Pages**.
+3. Under **Build and deployment**, set **Source** to **GitHub Actions**.
+4. Future pushes to `main` will build from `ipl-fantasy/` and deploy automatically.
 
 For local Pages validation:
 
