@@ -13,7 +13,7 @@
           <div>
             <label class="label">Username</label>
             <input class="input" [(ngModel)]="loginUsername" placeholder="e.g. siddu" (keydown.enter)="login()" />
-            <div class="small-text" style="margin-top: 4px;">Use lowercase usernames like siddu, venky, sampath, pa1, navdeep</div>
+            <div class="small-text" style="margin-top: 4px;">Use lowercase usernames like siddu, venky, sampath, pavan, navdeep</div>
           </div>
 
           <div>
@@ -352,6 +352,37 @@
                   <div class="team-copy">
                     <div class="team-code">{{ match.away }}</div>
                     <div class="team-name">{{ teamMeta[match.away].name }}</div>
+                  </div>
+                </div>
+              </div>
+
+              <div class="entry-banner stack">
+                <div class="toolbar" style="justify-content: space-between; align-items: center;">
+                  <span class="small-text" style="font-weight: 700;">{{ getEntryBannerSummary(match.id) }}</span>
+                  <span class="small-text muted">Pick tracker</span>
+                </div>
+
+                <div class="entry-row">
+                  <span class="entry-label success-text">Entered</span>
+                  <div class="entry-chips">
+                    @for (player of getSubmittedPlayersForMatch(match.id); track player) {
+                      <span class="chip success">{{ player }}</span>
+                    }
+                    @if (getSubmittedPlayersForMatch(match.id).length === 0) {
+                      <span class="small-text muted">No picks yet</span>
+                    }
+                  </div>
+                </div>
+
+                <div class="entry-row">
+                  <span class="entry-label danger-text">Pending</span>
+                  <div class="entry-chips">
+                    @for (player of getMissingPlayersForMatch(match.id); track player) {
+                      <span class="chip danger">{{ player }}</span>
+                    }
+                    @if (getMissingPlayersForMatch(match.id).length === 0) {
+                      <span class="small-text success-text">Everyone has submitted</span>
+                    }
                   </div>
                 </div>
               </div>
@@ -977,20 +1008,28 @@
                     <div class="section-title">Powerplay & Wickets</div>
                     <div class="form-grid">
                       <div>
-                        <label class="label">Powerplay Winner</label>
-                        <select class="select" [ngModel]="adminResultDraft().powerplayWinner" (ngModelChange)="updateAdminResult('powerplayWinner', $event)">
-                          <option value="">-- Select --</option>
-                          <option [value]="adminMatch()!.home">{{ adminMatch()!.home }}</option>
-                          <option [value]="adminMatch()!.away">{{ adminMatch()!.away }}</option>
-                        </select>
+                        <label class="label">{{ adminMatch()!.home }} Powerplay Score</label>
+                        <input class="input" type="number" [ngModel]="adminResultDraft().powerplayHomeScore" (ngModelChange)="updateAdminResult('powerplayHomeScore', +$event)" />
                       </div>
                       <div>
-                        <label class="label">Powerplay Score</label>
-                        <input class="input" type="number" [ngModel]="adminResultDraft().powerplayScore" (ngModelChange)="updateAdminResult('powerplayScore', +$event)" />
+                        <label class="label">{{ adminMatch()!.away }} Powerplay Score</label>
+                        <input class="input" type="number" [ngModel]="adminResultDraft().powerplayAwayScore" (ngModelChange)="updateAdminResult('powerplayAwayScore', +$event)" />
                       </div>
                       <div>
-                        <label class="label">Powerplay Diff</label>
-                        <input class="input" type="number" [ngModel]="adminResultDraft().powerplayDiff" (ngModelChange)="updateAdminResult('powerplayDiff', +$event)" />
+                        <label class="label">{{ adminMatch()!.home }} Powerplay Wickets Lost</label>
+                        <input class="input" type="number" [ngModel]="adminResultDraft().powerplayHomeWickets" (ngModelChange)="updateAdminResult('powerplayHomeWickets', +$event)" />
+                      </div>
+                      <div>
+                        <label class="label">{{ adminMatch()!.away }} Powerplay Wickets Lost</label>
+                        <input class="input" type="number" [ngModel]="adminResultDraft().powerplayAwayWickets" (ngModelChange)="updateAdminResult('powerplayAwayWickets', +$event)" />
+                      </div>
+                      <div>
+                        <label class="label">Derived Powerplay Winner</label>
+                        <div class="input" style="display: flex; align-items: center; min-height: 42px;">{{ getAdminPowerplayWinner() || 'No winner' }}</div>
+                      </div>
+                      <div>
+                        <label class="label">Powerplay Margin</label>
+                        <div class="input" style="display: flex; align-items: center; min-height: 42px;">{{ getAdminPowerplayMargin() }}</div>
                       </div>
                       <div>
                         <label class="label">Total Wickets Fallen</label>
@@ -1006,6 +1045,7 @@
                         </select>
                       </div>
                     </div>
+                    <div class="small-text">{{ getAdminPowerplaySummary() }}</div>
 
                     <div class="section-title">Horse Results</div>
                     <div class="form-grid">

@@ -30,11 +30,12 @@ export const TEAM_PLAYERS: Record<string, string[]> = {
 
 export const WICKET_RANGES = ['<5', '5-8', '9-11', '12-14', '15-17', '18-20'];
 export const DOUBLE_CATEGORIES = ['Winning Team', 'Best Batsman', 'Best Bowler', 'Powerplay Winner', 'Dot-Ball Bowler', 'Total Wickets'];
-export const FANTASY_PLAYERS = ['Siddu', 'Venky', 'Sampath', 'Pa1', 'Navdeep'];
+export const FANTASY_PLAYERS = ['Siddu', 'Venky', 'Sampath', 'Pavan', 'Navdeep'];
 export const DEFAULT_PLAYER_PASSWORDS: Record<string, string> = {
   siddu: 'Siddu@2026',
   venky: 'Venky@2026',
   sampath: 'Sampath@2026',
+  pavan: 'Pavan@2026',
 };
 
 export const EMPTY_SELECTION: SelectionRecord = {
@@ -51,7 +52,8 @@ export const EMPTY_SELECTION: SelectionRecord = {
 };
 
 export function normalizeFantasyUsername(name: string): string {
-  return name.toLowerCase().replace(/\s/g, '_');
+  const normalized = name.toLowerCase().replace(/\s/g, '_');
+  return normalized === 'pa1' ? 'pavan' : normalized;
 }
 
 export function getDefaultPlayerPassword(username: string): string {

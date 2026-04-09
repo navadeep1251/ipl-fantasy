@@ -72,7 +72,7 @@ export function calculateScore(
       scoreForBowler(selection.bestBowler) +
       (selection.bestBowler === currentResult.bestBowler ? (currentResult.bestBowlerPoints || 0) + 50 : 0),
     powerplayWinner:
-      selection.powerplayWinner === currentResult.powerplayWinner
+      currentResult.powerplayWinner && selection.powerplayWinner === currentResult.powerplayWinner
         ? (currentResult.powerplayScore || 0) + (currentResult.powerplayDiff || 0)
         : 0,
     dotBallBowler:

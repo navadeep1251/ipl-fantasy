@@ -33,7 +33,7 @@ export class DataService {
   ) {}
 
   async login(username: string, password: string): Promise<SessionUser> {
-    const normalizedUsername = username.toLowerCase().trim();
+    const normalizedUsername = normalizeFantasyUsername(username.trim());
     await this.ensureRemoteSeedData().catch(() => undefined);
 
     let user = await this.loadRemoteUser(normalizedUsername).catch(() => null);
@@ -257,6 +257,99 @@ export class DataService {
         'id',
       );
     }
+
+    await this.migrateLegacyFantasyUser('pa1', 'pavan', 'Pavan');
+  }
+
+  private async migrateLegacyFantasyUser(fromUsername: string, toUsername: string, displayName: string): Promise<void> {
+    await this.migrateLocalLegacyFantasyUser(fromUsername, toUsername, displayName);
+
+    try {
+      const [legacyUsers, canonicalUsers, legacySelections] = await Promise.all([
+        this.supabase.query<ArrayUserRow>('users', {
+          select: 'username,display_name,password,is_admin,created_at',
+          eq: { username: fromUsername },
+        }),
+        this.supabase.query<ArrayUserRow>('users', {
+          select: 'username,display_name,password,is_admin,created_at',
+          eq: { username: toUsername },
+        }),
+        this.supabase.query<SelectionRow>('selections', {
+          select: '*',
+          eq: { username: fromUsername },
+        }),
+      ]);
+
+      const legacyUser = legacyUsers[0];
+      const canonicalUser = canonicalUsers[0];
+
+      if (!legacyUser && !legacySelections.length && !canonicalUser) {
+        return;
+      }
+
+      if (legacyUser && !canonicalUser) {
+        await this.supabase.upsert(
+          'users',
+          {
+            username: toUsername,
+            display_name: displayName,
+            password: legacyUser.password,
+            is_admin: this.flagToBoolean(legacyUser.is_admin),
+            created_at: legacyUser.created_at,
+          },
+          'username',
+        );
+      }
+
+      if (legacySelections.length) {
+        await this.supabase.upsert(
+          'selections',
+          legacySelections.map((selection) => ({ ...selection, username: toUsername })),
+          'username,match_id',
+        );
+        await this.supabase.delete('selections', { username: fromUsername });
+      }
+
+      if (legacyUser) {
+        await this.supabase.delete('users', { username: fromUsername });
+      }
+    } catch {}
+  }
+
+  private async migrateLocalLegacyFantasyUser(fromUsername: string, toUsername: string, displayName: string): Promise<void> {
+    const [legacyUsers, canonicalUsers, legacySelections] = await Promise.all([
+      this.sqlite.all<ArrayUserRow>('SELECT * FROM users WHERE username = ?', [fromUsername]),
+      this.sqlite.all<ArrayUserRow>('SELECT * FROM users WHERE username = ?', [toUsername]),
+      this.sqlite.all<SelectionRow>('SELECT * FROM selections WHERE username = ?', [fromUsername]),
+    ]);
+
+    const legacyUser = legacyUsers[0];
+    const canonicalUser = canonicalUsers[0];
+
+    if (!legacyUser && !legacySelections.length && !canonicalUser) {
+      return;
+    }
+
+    if (legacyUser && !canonicalUser) {
+      await this.cacheUsers([
+        {
+          username: toUsername,
+          display_name: displayName,
+          password: legacyUser.password,
+          is_admin: legacyUser.is_admin,
+          created_at: legacyUser.created_at,
+        },
+      ]);
+    }
+
+    if (legacySelections.length) {
+      await this.cacheSelections(legacySelections.map((selection) => ({ ...selection, username: toUsername })));
+      await this.sqlite.run('DELETE FROM selections WHERE username = ?', [fromUsername]);
+    }
+
+    if (legacyUser) {
+      await this.sqlite.run('DELETE FROM users WHERE username = ?', [fromUsername]);
+    }
   }
 
   private async upsertSelection(username: string, matchId: number, selection: SelectionRecord): Promise<void> {
@@ -330,9 +423,10 @@ export class DataService {
         sql: `INSERT INTO results (
           match_id, winning_team, win_by_runs, run_margin, wicket_margin, top_scorer,
           top_scorer_runs, best_bowler, best_bowler_points, powerplay_winner, powerplay_score,
-          powerplay_diff, dot_ball_leader, dot_balls, total_wickets, wickets_range,
+          powerplay_diff, powerplay_home_score, powerplay_away_score, powerplay_home_wickets,
+          powerplay_away_wickets, dot_ball_leader, dot_balls, total_wickets, wickets_range,
           duck_batsmen, match_top_player, match_bottom_player
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ON CONFLICT(match_id) DO UPDATE SET
           winning_team = excluded.winning_team,
           win_by_runs = excluded.win_by_runs,
@@ -345,6 +439,10 @@ export class DataService {
           powerplay_winner = excluded.powerplay_winner,
           powerplay_score = excluded.powerplay_score,
           powerplay_diff = excluded.powerplay_diff,
+          powerplay_home_score = excluded.powerplay_home_score,
+          powerplay_away_score = excluded.powerplay_away_score,
+          powerplay_home_wickets = excluded.powerplay_home_wickets,
+          powerplay_away_wickets = excluded.powerplay_away_wickets,
           dot_ball_leader = excluded.dot_ball_leader,
           dot_balls = excluded.dot_balls,
           total_wickets = excluded.total_wickets,
@@ -365,6 +463,10 @@ export class DataService {
           row.powerplay_winner,
           row.powerplay_score,
           row.powerplay_diff,
+          row.powerplay_home_score,
+          row.powerplay_away_score,
+          row.powerplay_home_wickets,
+          row.powerplay_away_wickets,
           row.dot_ball_leader,
           row.dot_balls,
           row.total_wickets,
@@ -515,6 +617,10 @@ export class DataService {
         powerplayWinner: row.powerplay_winner,
         powerplayScore: row.powerplay_score,
         powerplayDiff: row.powerplay_diff,
+        powerplayHomeScore: row.powerplay_home_score ?? 0,
+        powerplayAwayScore: row.powerplay_away_score ?? 0,
+        powerplayHomeWickets: row.powerplay_home_wickets ?? 0,
+        powerplayAwayWickets: row.powerplay_away_wickets ?? 0,
         dotBallLeader: row.dot_ball_leader,
         dotBalls: row.dot_balls,
         totalWickets: row.total_wickets,
@@ -602,6 +708,10 @@ export class DataService {
       powerplay_winner: result.powerplayWinner,
       powerplay_score: result.powerplayScore,
       powerplay_diff: result.powerplayDiff,
+      powerplay_home_score: result.powerplayHomeScore,
+      powerplay_away_score: result.powerplayAwayScore,
+      powerplay_home_wickets: result.powerplayHomeWickets,
+      powerplay_away_wickets: result.powerplayAwayWickets,
       dot_ball_leader: result.dotBallLeader,
       dot_balls: result.dotBalls,
       total_wickets: result.totalWickets,
@@ -676,6 +786,10 @@ interface ResultRow {
   powerplay_winner: string;
   powerplay_score: number;
   powerplay_diff: number;
+  powerplay_home_score: number;
+  powerplay_away_score: number;
+  powerplay_home_wickets: number;
+  powerplay_away_wickets: number;
   dot_ball_leader: string;
   dot_balls: number;
   total_wickets: number;

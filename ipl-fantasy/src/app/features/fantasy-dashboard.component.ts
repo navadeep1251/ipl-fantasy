@@ -416,6 +416,20 @@ export class FantasyDashboardComponent {
     return `M${match.id}: ${match.home} vs ${match.away} — ${match.date} (${suffix})`;
   }
 
+  getSubmittedPlayersForMatch(matchId: number) {
+    return this.fantasyPlayers.filter((name) => !!this.selections()[normalizeFantasyUsername(name)]?.[matchId]);
+  }
+
+  getMissingPlayersForMatch(matchId: number) {
+    const submitted = new Set(this.getSubmittedPlayersForMatch(matchId));
+    return this.fantasyPlayers.filter((name) => !submitted.has(name));
+  }
+
+  getEntryBannerSummary(matchId: number) {
+    const submittedCount = this.getSubmittedPlayersForMatch(matchId).length;
+    return `${submittedCount}/${this.fantasyPlayers.length} picks submitted`;
+  }
+
   getAdminLockLabel(match: MatchRecord) {
     if (this.results()[match.id]) {
       return '✓ Completed';
@@ -701,14 +715,20 @@ export class FantasyDashboardComponent {
     this.adminSavingResult.set(true);
     try {
       const draft = this.adminResultDraft();
+      const powerplayResult = this.derivePowerplayOutcome(match, draft);
       const payload: MatchResult = {
         ...draft,
         runMargin: Number(draft.runMargin) || 0,
         wicketMargin: Number(draft.wicketMargin) || 0,
         topScorerRuns: Number(draft.topScorerRuns) || 0,
         bestBowlerPoints: Number(draft.bestBowlerPoints) || 0,
-        powerplayScore: Number(draft.powerplayScore) || 0,
-        powerplayDiff: Number(draft.powerplayDiff) || 0,
+        powerplayWinner: powerplayResult.winner,
+        powerplayScore: powerplayResult.score,
+        powerplayDiff: powerplayResult.diff,
+        powerplayHomeScore: Number(draft.powerplayHomeScore) || 0,
+        powerplayAwayScore: Number(draft.powerplayAwayScore) || 0,
+        powerplayHomeWickets: Number(draft.powerplayHomeWickets) || 0,
+        powerplayAwayWickets: Number(draft.powerplayAwayWickets) || 0,
         dotBalls: Number(draft.dotBalls) || 0,
         totalWickets: Number(draft.totalWickets) || 0,
       };
@@ -795,6 +815,39 @@ export class FantasyDashboardComponent {
     return (Number(row.breakdown['winningHorse']) || 0) + (Number(row.breakdown['losingHorse']) || 0);
   }
 
+  getAdminPowerplaySummary() {
+    const match = this.adminMatch();
+    if (!match) {
+      return '';
+    }
+
+    const outcome = this.derivePowerplayOutcome(match, this.adminResultDraft());
+    if (!outcome.winner) {
+      return 'No powerplay winner. Equal runs and wickets means no points awarded.';
+    }
+
+    const basis = outcome.tieBreakByWickets ? `fewer wickets lost by ${outcome.diff}` : `${outcome.diff} run lead`;
+    return `${outcome.winner} win the powerplay on ${basis}.`;
+  }
+
+  getAdminPowerplayWinner() {
+    const match = this.adminMatch();
+    if (!match) {
+      return '';
+    }
+
+    return this.derivePowerplayOutcome(match, this.adminResultDraft()).winner;
+  }
+
+  getAdminPowerplayMargin() {
+    const match = this.adminMatch();
+    if (!match) {
+      return 0;
+    }
+
+    return this.derivePowerplayOutcome(match, this.adminResultDraft()).diff;
+  }
+
   getCurrentUserScore(matchId: number) {
     return calculateScore(this.currentUserSelections()[matchId], this.results()[matchId], this.playerScores()[matchId] || {});
   }
@@ -811,7 +864,17 @@ export class FantasyDashboardComponent {
 
   private restoreSession(): SessionUser | null {
     try {
-      return JSON.parse(sessionStorage.getItem('ipl_user') || 'null');
+      const saved = JSON.parse(sessionStorage.getItem('ipl_user') || 'null') as SessionUser | null;
+      if (!saved) {
+        return null;
+      }
+
+      const normalizedUsername = normalizeFantasyUsername(saved.username);
+      return {
+        ...saved,
+        username: normalizedUsername,
+        displayName: normalizedUsername === 'pavan' ? 'Pavan' : saved.displayName,
+      };
     } catch {
       return null;
     }
@@ -830,6 +893,10 @@ export class FantasyDashboardComponent {
       powerplayWinner: '',
       powerplayScore: 0,
       powerplayDiff: 0,
+      powerplayHomeScore: 0,
+      powerplayAwayScore: 0,
+      powerplayHomeWickets: 0,
+      powerplayAwayWickets: 0,
       dotBallLeader: '',
       dotBalls: 0,
       totalWickets: 0,
@@ -838,5 +905,30 @@ export class FantasyDashboardComponent {
       matchTopPlayer: '',
       matchBottomPlayer: '',
     };
+  }
+
+  private derivePowerplayOutcome(match: MatchRecord, draft: MatchResult) {
+    const homeScore = Number(draft.powerplayHomeScore) || 0;
+    const awayScore = Number(draft.powerplayAwayScore) || 0;
+    const homeWickets = Number(draft.powerplayHomeWickets) || 0;
+    const awayWickets = Number(draft.powerplayAwayWickets) || 0;
+
+    if (homeScore > awayScore) {
+      return { winner: match.home, score: homeScore, diff: homeScore - awayScore, tieBreakByWickets: false };
+    }
+
+    if (awayScore > homeScore) {
+      return { winner: match.away, score: awayScore, diff: awayScore - homeScore, tieBreakByWickets: false };
+    }
+
+    if (homeWickets < awayWickets) {
+      return { winner: match.home, score: homeScore, diff: awayWickets - homeWickets, tieBreakByWickets: true };
+    }
+
+    if (awayWickets < homeWickets) {
+      return { winner: match.away, score: awayScore, diff: homeWickets - awayWickets, tieBreakByWickets: true };
+    }
+
+    return { winner: '', score: 0, diff: 0, tieBreakByWickets: false };
   }
 }

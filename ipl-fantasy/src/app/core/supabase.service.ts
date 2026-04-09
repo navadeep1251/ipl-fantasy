@@ -69,6 +69,23 @@ export class SupabaseService {
     return this.readResponse<T[]>(response);
   }
 
+  async delete<T>(table: string, filters: Record<string, string | number>): Promise<T[]> {
+    let url = `${this.baseUrl}/rest/v1/${table}?`;
+    for (const [key, value] of Object.entries(filters)) {
+      url += `${key}=eq.${encodeURIComponent(value)}&`;
+    }
+
+    const response = await fetch(url, {
+      method: 'DELETE',
+      headers: {
+        ...this.headers(),
+        Prefer: 'return=representation',
+      },
+    });
+
+    return this.readResponse<T[]>(response);
+  }
+
   subscribeToSharedChanges(options: {
     onChange: (payload: RealtimePostgresChangesPayload<Record<string, unknown>>) => void;
     onStatus?: (status: SupabaseSyncState) => void;

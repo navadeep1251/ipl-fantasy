@@ -26,6 +26,10 @@ export interface MatchResult {
   powerplayWinner: string;
   powerplayScore: number;
   powerplayDiff: number;
+  powerplayHomeScore: number;
+  powerplayAwayScore: number;
+  powerplayHomeWickets: number;
+  powerplayAwayWickets: number;
   dotBallLeader: string;
   dotBalls: number;
   totalWickets: number;

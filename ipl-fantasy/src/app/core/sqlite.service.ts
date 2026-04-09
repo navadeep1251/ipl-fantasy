@@ -152,6 +152,10 @@ export class SQLiteService {
         powerplay_winner TEXT,
         powerplay_score INTEGER,
         powerplay_diff INTEGER,
+        powerplay_home_score INTEGER,
+        powerplay_away_score INTEGER,
+        powerplay_home_wickets INTEGER,
+        powerplay_away_wickets INTEGER,
         dot_ball_leader TEXT,
         dot_balls INTEGER,
         total_wickets INTEGER,
@@ -212,6 +216,18 @@ export class SQLiteService {
     try {
       db.run('ALTER TABLE matches ADD COLUMN manual_lock_state INTEGER DEFAULT NULL');
     } catch {}
+    try {
+      db.run('ALTER TABLE results ADD COLUMN powerplay_home_score INTEGER DEFAULT 0');
+    } catch {}
+    try {
+      db.run('ALTER TABLE results ADD COLUMN powerplay_away_score INTEGER DEFAULT 0');
+    } catch {}
+    try {
+      db.run('ALTER TABLE results ADD COLUMN powerplay_home_wickets INTEGER DEFAULT 0');
+    } catch {}
+    try {
+      db.run('ALTER TABLE results ADD COLUMN powerplay_away_wickets INTEGER DEFAULT 0');
+    } catch {}
   }
 
   private seedIfNeeded(db: SqlJsDatabase): void {
@@ -245,9 +261,10 @@ export class SQLiteService {
           `INSERT INTO results (
             match_id, winning_team, win_by_runs, run_margin, wicket_margin, top_scorer,
             top_scorer_runs, best_bowler, best_bowler_points, powerplay_winner, powerplay_score,
-            powerplay_diff, dot_ball_leader, dot_balls, total_wickets, wickets_range,
+            powerplay_diff, powerplay_home_score, powerplay_away_score, powerplay_home_wickets,
+            powerplay_away_wickets, dot_ball_leader, dot_balls, total_wickets, wickets_range,
             duck_batsmen, match_top_player, match_bottom_player
-          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)` ,
           [
             result.match_id,
             result.winning_team,
@@ -261,6 +278,10 @@ export class SQLiteService {
             result.powerplay_winner,
             result.powerplay_score,
             result.powerplay_diff,
+            result.powerplay_home_score ?? 0,
+            result.powerplay_away_score ?? 0,
+            result.powerplay_home_wickets ?? 0,
+            result.powerplay_away_wickets ?? 0,
             result.dot_ball_leader,
             result.dot_balls,
             result.total_wickets,

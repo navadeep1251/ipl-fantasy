@@ -29,6 +29,10 @@ create table if not exists public.results (
   powerplay_winner text,
   powerplay_score integer,
   powerplay_diff integer,
+  powerplay_home_score integer default 0,
+  powerplay_away_score integer default 0,
+  powerplay_home_wickets integer default 0,
+  powerplay_away_wickets integer default 0,
   dot_ball_leader text,
   dot_balls integer,
   total_wickets integer,
@@ -37,6 +41,11 @@ create table if not exists public.results (
   match_top_player text,
   match_bottom_player text
 );
+
+alter table public.results add column if not exists powerplay_home_score integer default 0;
+alter table public.results add column if not exists powerplay_away_score integer default 0;
+alter table public.results add column if not exists powerplay_home_wickets integer default 0;
+alter table public.results add column if not exists powerplay_away_wickets integer default 0;
 
 create table if not exists public.selections (
   username text not null references public.users (username) on delete cascade,
