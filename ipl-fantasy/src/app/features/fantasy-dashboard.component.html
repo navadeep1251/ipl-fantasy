@@ -874,7 +874,7 @@
                 @if (matches().length === 0) {
                   <div class="muted">No matches available</div>
                 }
-                @for (match of matches(); track match.id) {
+                @for (match of adminSortedMatches(); track match.id) {
                   <div class="card match-card" (click)="openAdminMatch(match)">
                     <div class="toolbar" style="justify-content: space-between;">
                       <div class="toolbar">

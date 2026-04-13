@@ -159,7 +159,9 @@ export function buildConsolidatedTable(
   results: Record<number, MatchResult>,
   playerScores: PlayerScoresMap,
 ) {
-  const lockedMatches = matches.filter((match) => !!results[match.id] || isMatchLocked(match, new Date()));
+  const lockedMatches = matches
+    .filter((match) => !!results[match.id] || isMatchLocked(match, new Date()))
+    .sort((a, b) => b.id - a.id);
   const pointsByPlayer: Record<string, Record<number, number>> = {};
   const totalPoints: Record<string, number> = {};
   const winningsByPlayer: Record<string, Record<number, number>> = {};

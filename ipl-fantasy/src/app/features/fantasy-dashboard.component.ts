@@ -159,7 +159,7 @@ export class FantasyDashboardComponent {
   readonly filteredMatches = computed(() => {
     const now = this.now();
     const filter = this.matchFilter();
-    return this.matches().filter((match) => {
+    const filtered = this.matches().filter((match) => {
       const status = this.getStatus(match, now);
       if (filter === 'all') {
         return true;
@@ -169,9 +169,32 @@ export class FantasyDashboardComponent {
       }
       return status === filter;
     });
+    return filtered.sort((a, b) => {
+      const statusA = this.getStatus(a, now);
+      const statusB = this.getStatus(b, now);
+      const isOpenA = statusA === 'open' || statusA === 'submitted';
+      const isOpenB = statusB === 'open' || statusB === 'submitted';
+      if (isOpenA !== isOpenB) return isOpenA ? -1 : 1;
+      if (isOpenA) return a.id - b.id;
+      return b.id - a.id;
+    });
   });
 
-  readonly lockedMatches = computed(() => this.matches().filter((match) => !!this.results()[match.id] || isMatchLocked(match, this.now())));
+  readonly lockedMatches = computed(() =>
+    this.matches()
+      .filter((match) => !!this.results()[match.id] || isMatchLocked(match, this.now()))
+      .sort((a, b) => b.id - a.id),
+  );
+  readonly adminSortedMatches = computed(() => {
+    const now = this.now();
+    return [...this.matches()].sort((a, b) => {
+      const priorityA = this.results()[a.id] ? 2 : isMatchLocked(a, now) ? 1 : 0;
+      const priorityB = this.results()[b.id] ? 2 : isMatchLocked(b, now) ? 1 : 0;
+      if (priorityA !== priorityB) return priorityA - priorityB;
+      if (priorityA === 0) return a.id - b.id;
+      return b.id - a.id;
+    });
+  });
   readonly picksVisibleMatches = computed(() => {
     const now = this.now();
     const windowEnd = now.getTime();
@@ -188,7 +211,7 @@ export class FantasyDashboardComponent {
       })
       .forEach((match) => visible.set(match.id, match));
 
-    return Array.from(visible.values()).sort((left, right) => left.id - right.id);
+    return Array.from(visible.values()).sort((left, right) => right.id - left.id);
   });
   readonly currentMatchPlayers = computed(() => (this.selectedMatch() ? getUniqueMatchPlayers(this.selectedMatch()!) : []));
   readonly selectedMatchScore = computed(() => {
