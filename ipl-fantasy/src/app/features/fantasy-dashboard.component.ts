@@ -53,8 +53,12 @@ interface UserRow {
 export class FantasyDashboardComponent {
   private readonly dataService = inject(DataService);
   private readonly supabaseService = inject(SupabaseService);
-  private readonly clockInterval = window.setInterval(() => this.now.set(new Date()), 30_000);
+  private readonly clockInterval = window.setInterval(() => {
+    this.now.set(new Date());
+    this.checkPickReminders();
+  }, 30_000);
   private readonly sharedRefreshInterval = window.setInterval(() => void this.refreshSharedData(), 15_000);
+  private readonly notifiedKeys = new Set<string>();
 
   readonly teamMeta = TEAM_META;
   readonly fantasyPlayers = FANTASY_PLAYERS;
@@ -126,6 +130,7 @@ export class FantasyDashboardComponent {
   readonly insightsUpdating = signal(false);
   readonly insightsUpdateResult = signal<any | null>(null);
   readonly insightsUpdateError = signal('');
+  readonly notificationPermission = signal<string>('Notification' in window ? Notification.permission : 'denied');
 
   readonly currentUserSelections = computed(() => {
     const currentUser = this.user();
@@ -187,13 +192,21 @@ export class FantasyDashboardComponent {
   );
   readonly adminSortedMatches = computed(() => {
     const now = this.now();
+    const todayStr = now.toDateString();
+    const matchPriority = (m: MatchRecord): number => {
+      if (this.results()[m.id]) return 3; // completed
+      const lockDate = new Date(m.lock_time);
+      if (lockDate.toDateString() === todayStr) return 0; // today's match
+      if (!isMatchLocked(m, now)) return 1; // upcoming
+      return 2; // locked, no result yet
+    };
     return [...this.matches()].sort((a, b) => {
-      const priorityA = this.results()[a.id] ? 2 : isMatchLocked(a, now) ? 1 : 0;
-      const priorityB = this.results()[b.id] ? 2 : isMatchLocked(b, now) ? 1 : 0;
-      if (priorityA !== priorityB) return priorityA - priorityB;
-      if (priorityA === 0) return a.id - b.id;
-      return b.id - a.id;
-    });
+      const pa = matchPriority(a);
+      const pb = matchPriority(b);
+      if (pa !== pb) return pa - pb;
+      if (pa === 3 || pa === 2) return b.id - a.id; // completed/locked newest first
+      return a.id - b.id; // today/upcoming earliest first
+    }); 
   });
   readonly picksVisibleMatches = computed(() => {
     const now = this.now();
@@ -361,6 +374,7 @@ export class FantasyDashboardComponent {
       this.applyDashboard(await this.dataService.loadDashboard());
       if (this.user()) {
         this.setSyncState(this.supabaseSyncState() === 'offline' ? 'offline' : 'connecting');
+        this.checkPickReminders();
       }
     } finally {
       this.loading.set(false);
@@ -482,6 +496,54 @@ export class FantasyDashboardComponent {
     this.selections.set(dashboard.selections);
     this.insights.set(dashboard.insights);
     this.playerScores.set(dashboard.playerScores);
+  }
+
+  async enableNotifications(): Promise<void> {
+    if (!('Notification' in window)) return;
+    const result = await Notification.requestPermission();
+    this.notificationPermission.set(result);
+    if (result === 'granted') {
+      this.checkPickReminders();
+    }
+  }
+
+  private checkPickReminders(): void {
+    if (!this.user()) return;
+    const now = new Date();
+    const results = this.results();
+    const userSelections = this.currentUserSelections();
+
+    for (const match of this.matches()) {
+      const status = getMatchStatus(match, now, results, userSelections);
+      if (status !== 'open') continue;
+
+      const msUntilLock = new Date(match.lock_time).getTime() - now.getTime();
+      if (msUntilLock <= 0) continue;
+
+      const label = `M${match.id}: ${match.home} vs ${match.away}`;
+
+      if (msUntilLock <= 60 * 60 * 1000) {
+        const key = `${match.id}-1hr`;
+        if (!this.notifiedKeys.has(key)) {
+          this.notifiedKeys.add(key);
+          this.sendPickReminder('⏰ 1 hour left!', `${label} – submit your picks before the deadline.`);
+        }
+      }
+
+      if (msUntilLock <= 20 * 60 * 1000) {
+        const key = `${match.id}-20min`;
+        if (!this.notifiedKeys.has(key)) {
+          this.notifiedKeys.add(key);
+          this.sendPickReminder('🚨 20 minutes left!', `${label} locks very soon — last chance to pick!`);
+        }
+      }
+    }
+  }
+
+  private sendPickReminder(title: string, body: string): void {
+    if ('Notification' in window && Notification.permission === 'granted') {
+      new Notification(title, { body, icon: '/logos/RCB.png', tag: 'ipl-pick-reminder' });
+    }
   }
 
   private setSyncState(state: SupabaseSyncState) {

@@ -313,6 +313,13 @@
             </div>
           </div>
 
+          @if (notificationPermission() === 'default') {
+            <div class="card toolbar" style="justify-content: space-between; padding: 10px 14px;">
+              <span class="small-text">🔔 Get reminders 1hr &amp; 20min before picks lock</span>
+              <button class="button ghost" style="padding: 5px 12px; font-size: 13px;" (click)="enableNotifications()">Enable</button>
+            </div>
+          }
+
           @for (match of filteredMatches(); track match.id) {
             <div class="card match-card stack" (click)="openMatch(match)">
               <div class="toolbar" style="justify-content: space-between;">
