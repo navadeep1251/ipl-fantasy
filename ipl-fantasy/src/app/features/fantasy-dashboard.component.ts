@@ -351,7 +351,7 @@ export class FantasyDashboardComponent {
 
     try {
       const currentUser = await this.dataService.login(this.loginUsername, this.loginPassword);
-      sessionStorage.setItem('ipl_user', JSON.stringify(currentUser));
+      this.persistSession(currentUser);
       this.user.set(currentUser);
     } catch (error) {
       this.loginError.set(error instanceof Error ? error.message : 'Connection error. Please try again.');
@@ -361,7 +361,7 @@ export class FantasyDashboardComponent {
   }
 
   logout() {
-    sessionStorage.removeItem('ipl_user');
+    localStorage.removeItem('ipl_session');
     this.user.set(null);
     this.activeTab.set('matches');
     this.selectedMatchId.set(null);
@@ -388,6 +388,7 @@ export class FantasyDashboardComponent {
 
     try {
       this.applyDashboard(await this.dataService.loadDashboard());
+      this.touchSession();
     } catch {}
   }
 
@@ -402,6 +403,7 @@ export class FantasyDashboardComponent {
   setActiveTab(tab: MainTab) {
     this.activeTab.set(tab);
     this.selectedMatchId.set(null);
+    this.touchSession();
   }
 
   openMatch(match: MatchRecord) {
@@ -948,21 +950,40 @@ export class FantasyDashboardComponent {
   trackByName = (_: number, name: string) => name;
 
   private restoreSession(): SessionUser | null {
+    const SESSION_TTL = 3 * 24 * 60 * 60 * 1000; // 3 days
     try {
-      const saved = JSON.parse(sessionStorage.getItem('ipl_user') || 'null') as SessionUser | null;
-      if (!saved) {
+      const raw = localStorage.getItem('ipl_session');
+      if (!raw) return null;
+      const { user, lastActive } = JSON.parse(raw) as { user: SessionUser; lastActive: number };
+      if (!user || !lastActive || Date.now() - lastActive > SESSION_TTL) {
+        localStorage.removeItem('ipl_session');
         return null;
       }
-
-      const normalizedUsername = normalizeFantasyUsername(saved.username);
+      const normalizedUsername = normalizeFantasyUsername(user.username);
       return {
-        ...saved,
+        ...user,
         username: normalizedUsername,
-        displayName: normalizedUsername === 'pavan' ? 'Pavan' : saved.displayName,
+        displayName: normalizedUsername === 'pavan' ? 'Pavan' : user.displayName,
       };
     } catch {
       return null;
     }
+  }
+
+  private persistSession(user: SessionUser): void {
+    localStorage.setItem('ipl_session', JSON.stringify({ user, lastActive: Date.now() }));
+  }
+
+  private touchSession(): void {
+    const current = this.user();
+    if (!current) return;
+    try {
+      const raw = localStorage.getItem('ipl_session');
+      if (!raw) return;
+      const parsed = JSON.parse(raw) as { user: SessionUser; lastActive: number };
+      parsed.lastActive = Date.now();
+      localStorage.setItem('ipl_session', JSON.stringify(parsed));
+    } catch {}
   }
 
   private emptyResult(): MatchResult {
