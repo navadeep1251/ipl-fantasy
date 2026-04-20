@@ -60,11 +60,37 @@ export function calculateScore(
   const scoreForDotBall = (name: string) => playerScores[name]?.dot_ball_score ?? 0;
 
   const currentResult = result ?? ({} as MatchResult);
+
+  // Calculate winning team score based on win type
+  let winningTeamScore = 0;
+  if (selection.winningTeam === currentResult.winningTeam && currentResult.winningTeam) {
+    winningTeamScore = 50; // Base points for correct team
+    
+    if (currentResult.winByRuns) {
+      // Win by runs scoring
+      const runMargin = currentResult.runMargin || 0;
+      winningTeamScore += runMargin; // Add the run margin
+      
+      if (runMargin > 50) {
+        winningTeamScore += 25; // Bonus for winning by more than 50 runs
+      } else if (runMargin >= 25 && runMargin <= 50) {
+        winningTeamScore += 10; // Bonus for winning by 25-50 runs
+      }
+    } else {
+      // Win by wickets scoring
+      const wicketMargin = currentResult.wicketMargin || 0;
+      winningTeamScore += wicketMargin * 5; // Multiply wicket margin by 5
+      
+      if (wicketMargin > 8) {
+        winningTeamScore += 25; // Bonus for winning by more than 8 wickets
+      } else if (wicketMargin >= 3 && wicketMargin <= 8) {
+        winningTeamScore += 10; // Bonus for winning by 3-8 wickets
+      }
+    }
+  }
+
   const breakdown: Record<string, number | string> = {
-    winningTeam:
-      selection.winningTeam === currentResult.winningTeam
-        ? 50 + Math.round((currentResult.runMargin || 0) / (((currentResult.wicketMargin || 1) || 1) * 5))
-        : 0,
+    winningTeam: winningTeamScore,
     bestBatsman:
       scoreForBatsman(selection.bestBatsman) +
       (selection.bestBatsman === currentResult.topScorer ? (currentResult.topScorerRuns || 0) + 50 : 0),
