@@ -64,6 +64,7 @@ export interface SelectionRecord {
   doubleCategory: string;
   winningHorse: string;
   losingHorse: string;
+  created_at?: string;
 }
 
 export interface PlayerScore {
@@ -108,6 +109,6 @@ export type PlayerScoresMap = Record<number, Record<string, PlayerScore>>;
 
 export type MainTab = 'matches' | 'selections' | 'live' | 'leaderboard' | 'admin';
 export type LeaderboardTab = 'board' | 'consolidated' | 'stats';
-export type LiveTab = 'grid' | 'update';
+export type LiveTab = 'grid' | 'update' | 'selections';
 export type AdminTab = 'results' | 'scores' | 'selections' | 'insights' | 'users';
 export type MatchFilter = 'all' | 'open' | 'locked' | 'completed';

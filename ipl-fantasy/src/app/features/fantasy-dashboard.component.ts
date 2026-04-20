@@ -122,6 +122,7 @@ export class FantasyDashboardComponent {
   readonly adminDuckCandidate = signal('');
   readonly adminSavingResult = signal(false);
   readonly adminSavedResult = signal(false);
+  readonly adminMatchFilter = signal<'all' | 'open' | 'locked' | 'completed'>('all');
 
   readonly users = signal<UserRow[]>([]);
   readonly usersLoading = signal(false);
@@ -192,39 +193,29 @@ export class FantasyDashboardComponent {
   );
   readonly adminSortedMatches = computed(() => {
     const now = this.now();
-    const todayStr = now.toDateString();
-    const matchPriority = (m: MatchRecord): number => {
-      if (this.results()[m.id]) return 3; // completed
-      const lockDate = new Date(m.lock_time);
-      if (lockDate.toDateString() === todayStr) return 0; // today's match
-      if (!isMatchLocked(m, now)) return 1; // upcoming
-      return 2; // locked, no result yet
-    };
-    return [...this.matches()].sort((a, b) => {
-      const pa = matchPriority(a);
-      const pb = matchPriority(b);
-      if (pa !== pb) return pa - pb;
-      if (pa === 3 || pa === 2) return b.id - a.id; // completed/locked newest first
-      return a.id - b.id; // today/upcoming earliest first
-    }); 
+    const filter = this.adminMatchFilter();
+    const results = this.results();
+    
+    let filtered = [...this.matches()];
+    
+    if (filter !== 'all') {
+      filtered = filtered.filter((match) => {
+        if (results[match.id]) return filter === 'completed';
+        if (isMatchLocked(match, now)) return filter === 'locked';
+        return filter === 'open';
+      });
+    }
+    
+    // Sort by filter type: completed/locked latest first (descending), open earliest first (ascending)
+    if (filter === 'completed' || filter === 'locked') {
+      return filtered.sort((a, b) => b.id - a.id);
+    }
+    
+    return filtered.sort((a, b) => a.id - b.id);
   });
   readonly picksVisibleMatches = computed(() => {
-    const now = this.now();
-    const windowEnd = now.getTime();
-    const visible = new Map<number, MatchRecord>();
-    this.lockedMatches().forEach((match) => visible.set(match.id, match));
-    this.matches()
-      .filter((match) => {
-        if (this.results()[match.id] || isMatchLocked(match, now)) {
-          return false;
-        }
-
-        const lockTime = new Date(match.lock_time).getTime();
-        return lockTime >= now.getTime() && lockTime <= windowEnd;
-      })
-      .forEach((match) => visible.set(match.id, match));
-
-    return Array.from(visible.values()).sort((left, right) => right.id - left.id);
+    // Show only locked matches (completed or time-locked)
+    return this.lockedMatches();
   });
   readonly currentMatchPlayers = computed(() => (this.selectedMatch() ? getUniqueMatchPlayers(this.selectedMatch()!) : []));
   readonly selectedMatchScore = computed(() => {
@@ -233,6 +224,13 @@ export class FantasyDashboardComponent {
       return null;
     }
     return calculateScore(this.selectionDraft(), this.results()[match.id], this.playerScores()[match.id] ?? {});
+  });
+
+  readonly picksMatchLocked = computed(() => {
+    const match = this.picksMatch();
+    if (!match) return false;
+    if (this.results()[match.id]) return true;
+    return isMatchLocked(match, this.now());
   });
 
   readonly liveLeaderboardRows = computed(() => {
@@ -430,12 +428,16 @@ export class FantasyDashboardComponent {
 
     this.selectionSaving.set(true);
     try {
-      await this.dataService.saveUserSelection(currentUser, match.id, this.selectionDraft());
+      const selectionWithTimestamp = {
+        ...this.selectionDraft(),
+        created_at: this.selectionDraft().created_at || new Date().toISOString(),
+      };
+      await this.dataService.saveUserSelection(currentUser, match.id, selectionWithTimestamp);
       this.selections.update((allSelections) => ({
         ...allSelections,
         [currentUser.username]: {
           ...(allSelections[currentUser.username] ?? {}),
-          [match.id]: { ...this.selectionDraft() },
+          [match.id]: selectionWithTimestamp,
         },
       }));
       this.selectionSavedMessage.set('Selections saved! ✓');
@@ -490,6 +492,40 @@ export class FantasyDashboardComponent {
     const manualLockState = shouldLock ? 1 : 0;
     await this.dataService.setMatchManualLockState(match.id, manualLockState);
     this.matches.update((rows) => rows.map((row) => (row.id === match.id ? { ...row, manual_lock_state: manualLockState } : row)));
+  }
+
+  getSelectionTimestamp(playerName: string, matchId: number): string | null {
+    const username = normalizeFantasyUsername(playerName);
+    const selection = this.selections()[username]?.[matchId];
+    return selection?.created_at || null;
+  }
+
+  formatTimestamp(timestamp: string | null | undefined): string {
+    if (!timestamp) return 'Not submitted';
+    const date = new Date(timestamp);
+    const now = this.now();
+    const diff = now.getTime() - date.getTime();
+    const hours = Math.floor(diff / (1000 * 60 * 60));
+    const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+
+    if (hours === 0) {
+      return `${minutes}m ago`;
+    }
+    if (hours < 24) {
+      return `${hours}h ${minutes}m ago`;
+    }
+
+    return date.toLocaleDateString() + ' ' + date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  }
+
+  isSelectionMade(playerName: string, matchId: number): boolean {
+    const username = normalizeFantasyUsername(playerName);
+    return !!this.selections()[username]?.[matchId];
+  }
+
+  checkMatchLocked(match: MatchRecord): boolean {
+    if (this.results()[match.id]) return true;
+    return isMatchLocked(match, this.now());
   }
 
   private applyDashboard(dashboard: Awaited<ReturnType<DataService['loadDashboard']>>) {
@@ -649,12 +685,16 @@ export class FantasyDashboardComponent {
     this.picksSaving.set(true);
     try {
       const username = normalizeFantasyUsername(playerName);
-      await this.dataService.saveAdminSelection(username, matchId, this.picksDraft());
+      const draftWithTimestamp = {
+        ...this.picksDraft(),
+        created_at: this.picksDraft().created_at || new Date().toISOString(),
+      };
+      await this.dataService.saveAdminSelection(username, matchId, draftWithTimestamp);
       this.selections.update((allSelections) => ({
         ...allSelections,
         [username]: {
           ...(allSelections[username] ?? {}),
-          [matchId]: { ...this.picksDraft() },
+          [matchId]: draftWithTimestamp,
         },
       }));
       this.picksSavedMessage.set(`Saved ${playerName}'s selections`);

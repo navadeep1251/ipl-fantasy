@@ -470,6 +470,7 @@
           <div class="tab-strip">
             <button class="tab-button" [class.active]="liveTab() === 'grid'" (click)="liveTab.set('grid')">🔴 Live Leaderboard</button>
             <button class="tab-button" [class.active]="liveTab() === 'update'" (click)="liveTab.set('update')">✏️ Update Player Stats</button>
+            <button class="tab-button" [class.active]="liveTab() === 'selections'" (click)="liveTab.set('selections')">🏆 Match Winners</button>
           </div>
 
           <div>
@@ -571,6 +572,90 @@
               </div>
               <div>
                 <button class="button primary" (click)="saveLiveScores()" [disabled]="liveSaving()">{{ liveSaving() ? 'Saving...' : 'Save Player Scores' }}</button>
+              </div>
+            }
+          }
+
+          @if (liveTab() === 'selections') {
+            @if (!liveUpdateMatchId()) {
+              <div class="card centered muted">Select a match above to view match result</div>
+            } @else if (!results()[liveUpdateMatchId()!]) {
+              <div class="card centered muted">No result entered yet for this match</div>
+            } @else {
+              @let r = results()[liveUpdateMatchId()!];
+              @let m = liveUpdateMatch()!;
+              <div class="card stack">
+                <div class="section-title">Match Result</div>
+                <div class="form-grid">
+                  <div>
+                    <div class="label">Winning Team</div>
+                    <div class="toolbar">
+                      <img class="team-logo" style="width: 28px; height: 28px;" [src]="teamMeta[r.winningTeam]?.logoUrl" [alt]="r.winningTeam" />
+                      <strong class="success-text">{{ r.winningTeam }}</strong>
+                    </div>
+                  </div>
+                  <div>
+                    <div class="label">Win Type</div>
+                    <div>
+                      @if (r.winByRuns) {
+                        <span class="chip info">By {{ r.runMargin }} Runs</span>
+                      } @else {
+                        <span class="chip info">By {{ r.wicketMargin }} Wickets</span>
+                      }
+                    </div>
+                  </div>
+                  <div>
+                    <div class="label">Top Scorer</div>
+                    <div><strong>{{ r.topScorer || '—' }}</strong> @if (r.topScorerRuns) { <span class="muted">(+{{ r.topScorerRuns }} bonus)</span> }</div>
+                  </div>
+                  <div>
+                    <div class="label">Best Bowler</div>
+                    <div><strong>{{ r.bestBowler || '—' }}</strong> @if (r.bestBowlerPoints) { <span class="muted">(+{{ r.bestBowlerPoints }} bonus)</span> }</div>
+                  </div>
+                  <div>
+                    <div class="label">Powerplay Winner</div>
+                    <div>
+                      @if (r.powerplayWinner) {
+                        <strong>{{ r.powerplayWinner }}</strong>
+                        <span class="muted"> — {{ m.home }}: {{ r.powerplayHomeScore }}/{{ r.powerplayHomeWickets }} | {{ m.away }}: {{ r.powerplayAwayScore }}/{{ r.powerplayAwayWickets }}</span>
+                      } @else {
+                        <span>— (tied)</span>
+                      }
+                    </div>
+                  </div>
+                  <div>
+                    <div class="label">Dot-Ball Leader</div>
+                    <div><strong>{{ r.dotBallLeader || '—' }}</strong></div>
+                  </div>
+                  <div>
+                    <div class="label">Total Wickets</div>
+                    <div><strong>{{ r.totalWickets }}</strong> <span class="muted">(Range: {{ r.wicketsRange || '—' }})</span></div>
+                  </div>
+                  <div>
+                    <div class="label">Duck Batsmen</div>
+                    <div class="toolbar">
+                      @if (r.duckBatsmen?.length) {
+                        @for (player of r.duckBatsmen; track player) {
+                          <span class="chip danger">{{ player }}</span>
+                        }
+                      } @else {
+                        <span class="muted">None</span>
+                      }
+                    </div>
+                  </div>
+                  @if (r.matchTopPlayer) {
+                    <div>
+                      <div class="label">🏆 Winning Horse</div>
+                      <div><strong class="gold-text">{{ r.matchTopPlayer }}</strong></div>
+                    </div>
+                  }
+                  @if (r.matchBottomPlayer) {
+                    <div>
+                      <div class="label">💀 Losing Horse</div>
+                      <div><strong class="danger-text">{{ r.matchBottomPlayer }}</strong></div>
+                    </div>
+                  }
+                </div>
               </div>
             }
           }
@@ -760,9 +845,10 @@
             <div>
               <label class="label">Select Match</label>
               <select class="select" [ngModel]="picksMatchId() ?? ''" (ngModelChange)="openPicksMatch($event)">
-                <option value="">-- Select a locked</option>
+                <option value="">-- Select a match --</option>
                 @for (match of picksVisibleMatches(); track match.id) {
-                  <option [value]="match.id">{{ getPicksMatchOptionLabel(match) }}</option>
+                  @let isLocked = checkMatchLocked(match);
+                  <option [value]="match.id">{{ isLocked ? '🔒' : '🕒' }} M{{ match.id }}: {{ match.home }} vs {{ match.away }} — {{ match.date }}</option>
                 }
               </select>
             </div>
@@ -780,12 +866,15 @@
                       @for (col of pickColumns; track col.key) {
                         <th>{{ col.label }}</th>
                       }
+                      <th style="color: #4CAF50; font-weight: 600;">Submitted</th>
                       <th>Actions</th>
                     </tr>
                   </thead>
                   <tbody>
                     @for (player of fantasyPlayers; track player) {
                       @let savedPick = selections()[player.toLowerCase().replaceAll(' ', '_')]?.[picksMatch()!.id];
+                      @let timestamp = getSelectionTimestamp(player, picksMatch()!.id);
+                      @let isSubmitted = isSelectionMade(player, picksMatch()!.id);
                       <tr>
                         <td class="sticky">{{ player }}</td>
                         @for (col of pickColumns; track col.key) {
@@ -798,10 +887,17 @@
                                 }
                               </select>
                             } @else {
-                              {{ savedPick?.[col.key] || '—' }}
+                              @if (!picksMatchLocked()) {
+                                <span style="font-size: 18px;">🔒</span>
+                              } @else {
+                                {{ savedPick?.[col.key] || '—' }}
+                              }
                             }
                           </td>
                         }
+                        <td [style.color]="isSubmitted ? '#4CAF50' : '#f44336'" style="font-weight: 600;">
+                          {{ formatTimestamp(timestamp) }}
+                        </td>
                         <td>
                           @if (picksEditingPlayer() === player) {
                             <div class="toolbar">
@@ -878,6 +974,15 @@
             <div class="two-col">
               <div class="stack">
                 <div class="section-title">All Matches</div>
+                <div style="margin-bottom: 16px;">
+                  <label class="label">Filter by Status</label>
+                  <select class="select" [ngModel]="adminMatchFilter()" (ngModelChange)="adminMatchFilter.set($event)">
+                    <option value="all">All Matches</option>
+                    <option value="completed">Completed</option>
+                    <option value="locked">Locked</option>
+                    <option value="open">Open</option>
+                  </select>
+                </div>
                 @if (matches().length === 0) {
                   <div class="muted">No matches available</div>
                 }
@@ -959,7 +1064,7 @@
                         </select>
                       </div>
                       <div>
-                        <label class="label">Runs Scored</label>
+                        <label class="label">Batting Bonus</label>
                         <input class="input" type="number" [ngModel]="adminResultDraft().topScorerRuns" (ngModelChange)="updateAdminResult('topScorerRuns', +$event)" />
                       </div>
                     </div>
@@ -994,7 +1099,7 @@
                         </select>
                       </div>
                       <div>
-                        <label class="label">Bowler Points</label>
+                        <label class="label">Bowling Bonus</label>
                         <input class="input" type="number" [ngModel]="adminResultDraft().bestBowlerPoints" (ngModelChange)="updateAdminResult('bestBowlerPoints', +$event)" />
                       </div>
                       <div>
@@ -1005,10 +1110,6 @@
                             <option [value]="player">{{ player }}</option>
                           }
                         </select>
-                      </div>
-                      <div>
-                        <label class="label">Dot Balls Bowled</label>
-                        <input class="input" type="number" [ngModel]="adminResultDraft().dotBalls" (ngModelChange)="updateAdminResult('dotBalls', +$event)" />
                       </div>
                     </div>
 
