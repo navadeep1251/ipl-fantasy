@@ -50,6 +50,7 @@ export function calculateScore(
   selection: SelectionRecord | undefined,
   result: MatchResult | undefined,
   playerScores: Record<string, PlayerScore> = {},
+  matchLockTime?: string,
 ): ScoreBreakdown {
   if (!selection) {
     return { breakdown: {}, total: 0 };
@@ -59,6 +60,7 @@ export function calculateScore(
   const scoreForBowler = (name: string) => playerScores[name]?.bowler_score ?? 0;
   const scoreForDotBall = (name: string) => playerScores[name]?.dot_ball_score ?? 0;
 
+  const horsePoints = matchLockTime && matchLockTime >= '2026-04-25' ? 50 : 100;
   const currentResult = result ?? ({} as MatchResult);
 
   // Calculate winning team score based on win type
@@ -108,9 +110,9 @@ export function calculateScore(
       selection.totalWickets === currentResult.wicketsRange ? (currentResult.totalWickets || 0) * 5 : 0,
     duckBatsman: (currentResult.duckBatsmen || []).includes(selection.duckBatsman) ? 100 : 0,
     winningHorse:
-      selection.winningHorse && currentResult.matchTopPlayer && selection.winningHorse === currentResult.matchTopPlayer ? 100 : 0,
+      selection.winningHorse && currentResult.matchTopPlayer && selection.winningHorse === currentResult.matchTopPlayer ? horsePoints : 0,
     losingHorse:
-      selection.losingHorse && currentResult.matchBottomPlayer && selection.losingHorse === currentResult.matchBottomPlayer ? 100 : 0,
+      selection.losingHorse && currentResult.matchBottomPlayer && selection.losingHorse === currentResult.matchBottomPlayer ? horsePoints : 0,
   };
 
   if (selection.doubleCategory) {
@@ -137,6 +139,7 @@ export function buildLiveLeaderboard(
   selections: SelectionMap,
   results: Record<number, MatchResult>,
   playerScores: PlayerScoresMap,
+  matchLockTime?: string,
 ): Array<{ name: string; total: number; breakdown: Record<string, number | string> }> {
   return FANTASY_PLAYERS.map((name) => {
     const normalized = name.toLowerCase().replace(/\s/g, '_');
@@ -145,7 +148,7 @@ export function buildLiveLeaderboard(
       return null;
     }
 
-    const calculated = calculateScore(selection, results[matchId], playerScores[matchId] ?? {});
+    const calculated = calculateScore(selection, results[matchId], playerScores[matchId] ?? {}, matchLockTime);
     return { name, total: calculated.total, breakdown: calculated.breakdown };
   })
     .filter((row): row is { name: string; total: number; breakdown: Record<string, number | string> } => !!row)
@@ -171,7 +174,7 @@ export function buildOverallLeaderboard(
         continue;
       }
 
-      total += calculateScore(picks[match.id], results[match.id], playerScores[match.id] ?? {}).total;
+      total += calculateScore(picks[match.id], results[match.id], playerScores[match.id] ?? {}, match.lock_time).total;
       matchCount += 1;
     }
 
@@ -205,7 +208,7 @@ export function buildConsolidatedTable(
   for (const match of lockedMatches) {
     const rows = FANTASY_PLAYERS.map((name) => {
       const normalized = name.toLowerCase().replace(/\s/g, '_');
-      const total = calculateScore(selections[normalized]?.[match.id], results[match.id], playerScores[match.id] ?? {}).total;
+      const total = calculateScore(selections[normalized]?.[match.id], results[match.id], playerScores[match.id] ?? {}, match.lock_time).total;
       pointsByPlayer[name][match.id] = total;
       totalPoints[name] += total;
       return { player: name, pts: total };

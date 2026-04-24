@@ -214,8 +214,16 @@ export class FantasyDashboardComponent {
     return filtered.sort((a, b) => a.id - b.id);
   });
   readonly picksVisibleMatches = computed(() => {
-    // Show only locked matches (completed or time-locked)
-    return this.lockedMatches();
+    const now = this.now();
+    const next24h = new Date(now.getTime() + 24 * 60 * 60 * 1000);
+    const upcoming = this.matches()
+      .filter((match) => {
+        if (this.results()[match.id] || isMatchLocked(match, now)) return false;
+        const lockTime = new Date(match.lock_time);
+        return lockTime > now && lockTime <= next24h;
+      })
+      .sort((a, b) => new Date(a.lock_time).getTime() - new Date(b.lock_time).getTime());
+    return [...upcoming, ...this.lockedMatches()];
   });
   readonly currentMatchPlayers = computed(() => (this.selectedMatch() ? getUniqueMatchPlayers(this.selectedMatch()!) : []));
   readonly selectedMatchScore = computed(() => {
@@ -223,7 +231,7 @@ export class FantasyDashboardComponent {
     if (!match || !this.results()[match.id]) {
       return null;
     }
-    return calculateScore(this.selectionDraft(), this.results()[match.id], this.playerScores()[match.id] ?? {});
+    return calculateScore(this.selectionDraft(), this.results()[match.id], this.playerScores()[match.id] ?? {}, match.lock_time);
   });
 
   readonly picksMatchLocked = computed(() => {
@@ -238,7 +246,8 @@ export class FantasyDashboardComponent {
     if (!matchId) {
       return [];
     }
-    return buildLiveLeaderboard(matchId, this.selections(), this.results(), this.playerScores());
+    const match = this.liveUpdateMatch();
+    return buildLiveLeaderboard(matchId, this.selections(), this.results(), this.playerScores(), match?.lock_time);
   });
 
   readonly overallLeaderboard = computed(() => buildOverallLeaderboard(this.matches(), this.selections(), this.results(), this.playerScores()));
@@ -252,7 +261,7 @@ export class FantasyDashboardComponent {
 
     const lockedMatches = this.lockedMatches().filter((match) => this.currentUserSelections()[match.id]);
     const totalPoints = lockedMatches.reduce(
-      (sum, match) => sum + calculateScore(this.currentUserSelections()[match.id], this.results()[match.id], this.playerScores()[match.id] ?? {}).total,
+      (sum, match) => sum + calculateScore(this.currentUserSelections()[match.id], this.results()[match.id], this.playerScores()[match.id] ?? {}, match.lock_time).total,
       0,
     );
 
@@ -453,7 +462,7 @@ export class FantasyDashboardComponent {
 
   getPicksMatchOptionLabel(match: MatchRecord) {
     const status = this.getStatus(match);
-    const suffix = status === 'completed' ? 'Completed' : status === 'locked' ? 'Locked' : 'Next 48h';
+    const suffix = status === 'completed' ? 'Completed' : status === 'locked' ? 'Locked' : 'Next 24h';
     return `M${match.id}: ${match.home} vs ${match.away} — ${match.date} (${suffix})`;
   }
 
@@ -631,7 +640,8 @@ export class FantasyDashboardComponent {
   }
 
   getSelectionBreakdownEntries(matchId: number, selection: SelectionRecord) {
-    return Object.entries(calculateScore(selection, this.results()[matchId], this.playerScores()[matchId] ?? {}).breakdown).filter(
+    const match = this.matches().find((m) => m.id === matchId);
+    return Object.entries(calculateScore(selection, this.results()[matchId], this.playerScores()[matchId] ?? {}, match?.lock_time).breakdown).filter(
       ([key]) => !key.startsWith('_'),
     );
   }
