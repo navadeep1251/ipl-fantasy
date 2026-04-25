@@ -450,7 +450,7 @@
                       </td>
                       @for (col of pickColumns; track col.key) {
                         <td>
-                          @if (!results()[picksMatch()!.id] && col.key !== 'winningTeam') {
+                          @if (!picksMatchLocked() && col.key !== 'winningTeam') {
                             🔒
                           } @else {
                             {{ savedPick?.[col.key] || '—' }}
