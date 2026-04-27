@@ -285,15 +285,25 @@ export class FantasyDashboardComponent {
     if (!match) {
       return [] as string[];
     }
-    const selected = new Set<string>();
+    const scoringPlayers = new Set<string>();
+    const duckOnlyPlayers = new Set<string>();
     Object.values(this.selections()).forEach((userSelections) => {
       const pick = userSelections[match.id];
       if (!pick) {
         return;
       }
-      [pick.bestBatsman, pick.bestBowler, pick.duckBatsman, pick.dotBallBowler].filter(Boolean).forEach((name) => selected.add(name));
+      [pick.bestBatsman, pick.bestBowler, pick.dotBallBowler].filter(Boolean).forEach((name) => scoringPlayers.add(name));
+      if (pick.duckBatsman && !scoringPlayers.has(pick.duckBatsman)) {
+        duckOnlyPlayers.add(pick.duckBatsman);
+      }
     });
-    return Array.from(selected).sort();
+    // Include duck picks only if they also appear in a scoring category
+    duckOnlyPlayers.forEach((name) => {
+      if (scoringPlayers.has(name)) {
+        duckOnlyPlayers.delete(name);
+      }
+    });
+    return Array.from(scoringPlayers).sort();
   });
 
   constructor() {
