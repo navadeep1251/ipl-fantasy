@@ -866,51 +866,53 @@
           }
 
           @if (leaderboardTab() === 'trophies') {
-            <div class="trophy-player-strip">
-              @for (entry of allTrophyCabinets(); track entry.name) {
-                @let count = getTrophyUnlockedCount(entry.trophies);
-                <button class="trophy-player-pill"
-                  [class.active]="activeTrophyPlayer()?.name === entry.name"
-                  (click)="selectedTrophyPlayer.set(entry.name)">
-                  <span class="trophy-pill-avatar">{{ entry.name[0] }}</span>
-                  <span>{{ entry.name }}</span>
-                  @if (count > 0) {
-                    <span class="trophy-pill-badge">{{ count }}</span>
-                  }
-                </button>
-              }
-            </div>
-
-            @let active = activeTrophyPlayer();
-            @if (active) {
-              @let unlockedCount = getTrophyUnlockedCount(active.trophies);
-              <div class="trophy-header card">
-                <div class="trophy-avatar">{{ active.name[0] }}</div>
-                <div>
-                  <div style="font-size: 18px; font-weight: 800; color: #f8fafc;">{{ active.name }}</div>
-                  <div class="gold-text" style="font-size: 13px; font-weight: 700;">{{ unlockedCount }} Trophies Unlocked</div>
-                </div>
-                <div class="trophy-header-icons">
-                  <span style="font-size: 28px;">🏆</span>
-                  <span style="font-size: 28px;">🔥</span>
-                </div>
-              </div>
-              <div class="trophy-grid">
-                @for (trophy of active.trophies; track trophy.id) {
-                  <div class="trophy-card" [class.trophy-unlocked]="trophy.unlocked" [style.--trophy-color]="trophy.color">
-                    @if (!trophy.unlocked) {
-                      <div class="trophy-lock">🔒 LOCKED</div>
+            <div class="trophy-cabinet-stage">
+              @let active = activeTrophyPlayer();
+              <div class="trophy-player-strip">
+                @for (entry of allTrophyCabinets(); track entry.name) {
+                  @let count = getTrophyUnlockedCount(entry.trophies);
+                  <button class="trophy-player-pill"
+                    [class.active]="active && active.name === entry.name"
+                    (click)="selectedTrophyPlayer.set(entry.name)">
+                    <span class="trophy-pill-avatar">{{ entry.name[0] }}</span>
+                    <span>{{ entry.name }}</span>
+                    @if (count > 0) {
+                      <span class="trophy-pill-badge">{{ count }}</span>
                     }
-                    <div class="trophy-emoji" [class.trophy-emoji-locked]="!trophy.unlocked">{{ trophy.emoji }}</div>
-                    <div class="trophy-label" [style.color]="trophy.unlocked ? trophy.color : null">{{ trophy.label }}</div>
-                    <div class="trophy-desc small-text">{{ trophy.desc }}</div>
-                    @if (trophy.unlocked && trophy.detail) {
-                      <div class="trophy-detail">{{ trophy.detail }}</div>
-                    }
-                  </div>
+                  </button>
                 }
               </div>
-            }
+
+              @if (active) {
+                @let unlockedCount = getTrophyUnlockedCount(active.trophies);
+                <div class="trophy-header card">
+                  <div class="trophy-avatar">{{ active.name[0] }}</div>
+                  <div>
+                    <div style="font-size: 18px; font-weight: 800; color: #f8fafc;">{{ active.name }}</div>
+                    <div class="gold-text" style="font-size: 13px; font-weight: 700;">{{ unlockedCount }} Trophies Unlocked</div>
+                  </div>
+                  <div class="trophy-header-icons">
+                    <span style="font-size: 28px;">🏆</span>
+                    <span style="font-size: 28px;">🔥</span>
+                  </div>
+                </div>
+                <div class="trophy-grid">
+                  @for (trophy of active.trophies; track trophy.id) {
+                    <div class="trophy-card" [class.trophy-unlocked]="trophy.unlocked" [style.--trophy-color]="trophy.color">
+                      @if (!trophy.unlocked) {
+                        <div class="trophy-lock">🔒 LOCKED</div>
+                      }
+                      <div class="trophy-emoji" [class.trophy-emoji-locked]="!trophy.unlocked">{{ trophy.emoji }}</div>
+                      <div class="trophy-label" [style.color]="trophy.unlocked ? trophy.color : null">{{ trophy.label }}</div>
+                      <div class="trophy-desc small-text">{{ trophy.desc }}</div>
+                      @if (trophy.unlocked && trophy.detail) {
+                        <div class="trophy-detail">{{ trophy.detail }}</div>
+                      }
+                    </div>
+                  }
+                </div>
+              }
+            </div>
           }
         </section>
       } @else if (activeTab() === 'admin' && user()!.isAdmin) {
