@@ -107,7 +107,7 @@ export function calculateScore(
       scoreForDotBall(selection.dotBallBowler) +
       (selection.dotBallBowler === currentResult.dotBallLeader ? 50 + (currentResult.dotBalls || 0) * 5 : 0),
     totalWickets:
-      selection.totalWickets === currentResult.wicketsRange ? (currentResult.totalWickets || 0) * 5 : 0,
+      selection.totalWickets === currentResult.wicketsRange ? 100 : 0,
     duckBatsman: (currentResult.duckBatsmen || []).includes(selection.duckBatsman) ? 100 : 0,
     winningHorse:
       selection.winningHorse && currentResult.matchTopPlayer && selection.winningHorse === currentResult.matchTopPlayer ? horsePoints : 0,
@@ -274,3 +274,134 @@ export async function triggerInsightsUpdate(): Promise<unknown> {
 
   return response.json();
 }
+
+// ── Trophy System ──────────────────────────────────────────────────────────
+
+export interface Trophy {
+  id: string;
+  label: string;
+  desc: string;
+  emoji: string;
+  color: string;
+  unlocked: boolean;
+  detail: string;
+}
+
+export const TROPHY_DEFS: Array<Omit<Trophy, 'unlocked' | 'detail'>> = [
+  { id: 'baahubali',     label: 'Baahubali',        desc: 'Overall Rank #1. Nene Raju, Nene Mantri.',                     emoji: '👑',  color: '#FFD700' },
+  { id: 'thaggedhele',  label: 'Thaggedhe Le!',     desc: '4+ Match Win Streak. Unstoppable Pushpa.',                      emoji: '🪓',  color: '#ef4444' },
+  { id: 'ironleg',      label: 'Iron Leg',           desc: '4+ Match Loss Streak. Daridram thandavam aaduthundi!',          emoji: '🦶',  color: '#9ca3af' },
+  { id: 'akkadaspace',  label: 'Akkada Space Ledu',  desc: 'Picked a unique Horse that scored big.',                        emoji: '🧠',  color: '#8b5cf6' },
+  { id: 'mindblock',    label: 'Mind Block',         desc: 'Highest single match score ever recorded.',                     emoji: '🤯',  color: '#ec4899' },
+  { id: 'confusion',    label: 'Confusion Master',   desc: 'Coin flip win/loss streak. Naku em kanipistaledu.',             emoji: '🎭',  color: '#f97316' },
+  { id: 'bokkaboshnam', label: 'Bokka Boshnam',      desc: 'Picked a duck batsman! Enno anukuntam...',                      emoji: '🦆',  color: '#64748b' },
+  { id: 'slowpoison',   label: 'Slow Poison',        desc: 'Zero risk picks. Emito, antha hayiga undi.',                    emoji: '🐢',  color: '#10b981' },
+  { id: 'lastbench',    label: 'Last Bench',         desc: 'Dead last in Leaderboard. Naku eem telidu mastaru.',            emoji: '🛡️', color: '#374151' },
+  { id: 'dookudu',      label: 'Dookudu',            desc: 'Moved up 3+ ranks at once. Evadu kodithe dimma...',             emoji: '🤫',  color: '#3b82f6' },
+  { id: 'sixerking',    label: 'Sixer King',         desc: 'Picked a batsman hitting >8 sixes.',                            emoji: '🏏',  color: '#f43f5e' },
+  { id: 'wicketveta',   label: 'Wicket Veta',        desc: 'Picked a 4-wicket haul bowler. Naa kodaka...',                  emoji: '🎳',  color: '#0ea5e9' },
+];
+
+export function computeTrophies(
+  playerName: string,
+  matches: MatchRecord[],
+  results: Record<number, MatchResult>,
+  allSelections: SelectionMap,
+  playerScores: PlayerScoresMap,
+  overallRank: number,
+  totalPlayers: number,
+): Trophy[] {
+  const unlocked: { id: string; detail: string }[] = [];
+  const award = (id: string, detail: string) => {
+    if (!unlocked.some((t) => t.id === id)) unlocked.push({ id, detail });
+  };
+
+  const normalized = playerName.toLowerCase().replace(/\s/g, '_');
+  const userSelections = allSelections[normalized] ?? {};
+
+  if (overallRank === 1) award('baahubali', 'Currently Top of the Leaderboard!');
+  if (overallRank === totalPlayers) award('lastbench', 'Currently Dead Last... yikes.');
+
+  const completedMatches = matches
+    .filter((m) => !!results[m.id])
+    .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+
+  let winStreak = 0, lossStreak = 0, altStreak = 0;
+  let lastCorrect: boolean | null = null;
+
+  for (const m of completedMatches) {
+    const result = results[m.id];
+    const pick = userSelections[m.id];
+    if (!pick) continue;
+
+    const correctTeam = pick.winningTeam === result.winningTeam;
+    if (correctTeam) { winStreak++; lossStreak = 0; } else { lossStreak++; winStreak = 0; }
+    if (winStreak >= 4) award('thaggedhele', `Hit 4+ Win Streak by Match ${m.id}`);
+    if (lossStreak >= 4) award('ironleg', `Lost 4 picks in a row by Match ${m.id}`);
+
+    if (lastCorrect !== null && correctTeam !== lastCorrect) altStreak++;
+    else altStreak = 0;
+    if (altStreak >= 3) award('confusion', `Win/Loss Seesaw across 3 matches (M${m.id})`);
+    lastCorrect = correctTeam;
+
+    const score = calculateScore(pick, result, playerScores[m.id] ?? {}, m.lock_time);
+    if (score.total >= 280) award('mindblock', `Scored ${score.total} Pts in Match ${m.id}`);
+
+    if ((result.duckBatsmen ?? []).includes(pick.duckBatsman)) {
+      award('bokkaboshnam', `Match ${m.id}: ${pick.duckBatsman} got out for a duck!`);
+    }
+
+    const batsmanData = (playerScores[m.id] ?? {})[pick.bestBatsman];
+    if (batsmanData && (batsmanData.sixes ?? 0) > 8) {
+      award('sixerking', `Match ${m.id}: ${pick.bestBatsman} (${batsmanData.sixes} Sixes!)`);
+    }
+
+    const bowlerData = (playerScores[m.id] ?? {})[pick.bestBowler];
+    if (bowlerData && (bowlerData.wickets ?? 0) >= 4) {
+      award('wicketveta', `Match ${m.id}: ${pick.bestBowler} (${bowlerData.wickets} Wickets!)`);
+    }
+
+    if (pick.winningHorse && result.matchTopPlayer && pick.winningHorse === result.matchTopPlayer) {
+      let count = 0;
+      Object.values(allSelections).forEach((playerPicks) => {
+        if (playerPicks[m.id]?.winningHorse === pick.winningHorse) count++;
+      });
+      if (count === 1) award('akkadaspace', `Match ${m.id}: Unique pick — ${pick.winningHorse}`);
+    }
+  }
+
+  // Dookudu — moved up 3+ ranks in one match
+  if (completedMatches.length >= 2) {
+    const lastMatch = completedMatches[completedMatches.length - 1];
+    const prevTotals: Record<string, number> = {};
+    const currTotals: Record<string, number> = {};
+    FANTASY_PLAYERS.forEach((p) => {
+      const key = p.toLowerCase().replace(/\s/g, '_');
+      const picks = allSelections[key] ?? {};
+      prevTotals[p] = 0;
+      currTotals[p] = 0;
+      completedMatches.forEach((m) => {
+        const pts = calculateScore(picks[m.id], results[m.id], playerScores[m.id] ?? {}, m.lock_time).total;
+        if (m.id !== lastMatch.id) prevTotals[p] += pts;
+        currTotals[p] += pts;
+      });
+    });
+    const sortedPrev = [...FANTASY_PLAYERS].sort((a, b) => prevTotals[b] - prevTotals[a]);
+    const sortedCurr = [...FANTASY_PLAYERS].sort((a, b) => currTotals[b] - currTotals[a]);
+    const prevRank = sortedPrev.indexOf(playerName) + 1;
+    const currRank = sortedCurr.indexOf(playerName) + 1;
+    if (prevRank - currRank >= 3) {
+      award('dookudu', `Jumped ${prevRank - currRank} ranks at once`);
+    }
+  }
+
+  // Slow Poison — earned if only 0-1 other trophies (not counting itself)
+  if (unlocked.length <= 1) award('slowpoison', 'Too Safe: Minimum risk taken.');
+
+  return TROPHY_DEFS.map((def) => ({
+    ...def,
+    unlocked: unlocked.some((t) => t.id === def.id),
+    detail: unlocked.find((t) => t.id === def.id)?.detail ?? '',
+  }));
+}
+

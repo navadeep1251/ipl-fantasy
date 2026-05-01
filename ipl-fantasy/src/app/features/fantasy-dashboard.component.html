@@ -475,6 +475,7 @@
 
           <div class="tab-strip">
             <button class="tab-button" [class.active]="liveTab() === 'grid'" (click)="liveTab.set('grid')">🔴 Live Leaderboard</button>
+            <button class="tab-button" [class.active]="liveTab() === 'picks'" (click)="liveTab.set('picks')">🥧 Pick Distributions</button>
             <button class="tab-button" [class.active]="liveTab() === 'update'" (click)="liveTab.set('update')">✏️ Update Player Stats</button>
             <button class="tab-button" [class.active]="liveTab() === 'selections'" (click)="liveTab.set('selections')">🏆 Match Winners</button>
           </div>
@@ -530,6 +531,37 @@
                     }
                   </tbody>
                 </table>
+              </div>
+            }
+          }
+
+          @if (liveTab() === 'picks') {
+            @if (!liveUpdateMatchId()) {
+              <div class="card centered muted">Select a match above to view pick distributions</div>
+            } @else {
+              <div class="pie-grid">
+                @for (chart of livePickDistributions()!; track chart.key) {
+                  <div class="card pie-chart-card">
+                    <div class="section-title" style="text-align: center; margin-bottom: 0;">{{ chart.label }}</div>
+                    @if (chart.entries.length === 0) {
+                      <div class="centered muted small-text" style="padding: 20px 0;">No picks yet</div>
+                    } @else {
+                      <svg viewBox="0 0 200 200" class="pie-svg" xmlns="http://www.w3.org/2000/svg">
+                        @for (slice of chart.slices; track slice.name) {
+                          <path [attr.d]="slice.d" [attr.fill]="slice.color" opacity="0.92" />
+                        }
+                      </svg>
+                      <div class="pie-legend">
+                        @for (slice of chart.slices; track slice.name) {
+                          <div class="pie-legend-item">
+                            <span class="pie-dot" [ngStyle]="{ background: slice.color }"></span>
+                            <span class="small-text">{{ slice.name }} ({{ slice.count }})</span>
+                          </div>
+                        }
+                      </div>
+                    }
+                  </div>
+                }
               </div>
             }
           }
@@ -634,8 +666,8 @@
                     <div><strong>{{ r.dotBallLeader || '—' }}</strong></div>
                   </div>
                   <div>
-                    <div class="label">Total Wickets</div>
-                    <div><strong>{{ r.totalWickets }}</strong> <span class="muted">(Range: {{ r.wicketsRange || '—' }})</span></div>
+                    <div class="label">Wickets Range</div>
+                    <div><strong>{{ r.wicketsRange || '—' }}</strong></div>
                   </div>
                   <div>
                     <div class="label">Duck Batsmen</div>
@@ -676,6 +708,7 @@
           <div class="tab-strip">
             <button class="tab-button" [class.active]="leaderboardTab() === 'board'" (click)="leaderboardTab.set('board')">🏆 Overall Leaderboard</button>
             <button class="tab-button" [class.active]="leaderboardTab() === 'consolidated'" (click)="leaderboardTab.set('consolidated')">📈 Consolidated Score</button>
+            <button class="tab-button" [class.active]="leaderboardTab() === 'trophies'" (click)="leaderboardTab.set('trophies')">🏅 Trophy Cabinet</button>
             <button class="tab-button" [class.active]="leaderboardTab() === 'stats'" (click)="leaderboardTab.set('stats')">📊 My Performance</button>
           </div>
 
@@ -829,6 +862,54 @@
                   </div>
                 </div>
               }
+            }
+          }
+
+          @if (leaderboardTab() === 'trophies') {
+            <div class="trophy-player-strip">
+              @for (entry of allTrophyCabinets(); track entry.name) {
+                @let count = getTrophyUnlockedCount(entry.trophies);
+                <button class="trophy-player-pill"
+                  [class.active]="activeTrophyPlayer()?.name === entry.name"
+                  (click)="selectedTrophyPlayer.set(entry.name)">
+                  <span class="trophy-pill-avatar">{{ entry.name[0] }}</span>
+                  <span>{{ entry.name }}</span>
+                  @if (count > 0) {
+                    <span class="trophy-pill-badge">{{ count }}</span>
+                  }
+                </button>
+              }
+            </div>
+
+            @let active = activeTrophyPlayer();
+            @if (active) {
+              @let unlockedCount = getTrophyUnlockedCount(active.trophies);
+              <div class="trophy-header card">
+                <div class="trophy-avatar">{{ active.name[0] }}</div>
+                <div>
+                  <div style="font-size: 18px; font-weight: 800; color: #f8fafc;">{{ active.name }}</div>
+                  <div class="gold-text" style="font-size: 13px; font-weight: 700;">{{ unlockedCount }} Trophies Unlocked</div>
+                </div>
+                <div class="trophy-header-icons">
+                  <span style="font-size: 28px;">🏆</span>
+                  <span style="font-size: 28px;">🔥</span>
+                </div>
+              </div>
+              <div class="trophy-grid">
+                @for (trophy of active.trophies; track trophy.id) {
+                  <div class="trophy-card" [class.trophy-unlocked]="trophy.unlocked" [style.--trophy-color]="trophy.color">
+                    @if (!trophy.unlocked) {
+                      <div class="trophy-lock">🔒 LOCKED</div>
+                    }
+                    <div class="trophy-emoji" [class.trophy-emoji-locked]="!trophy.unlocked">{{ trophy.emoji }}</div>
+                    <div class="trophy-label" [style.color]="trophy.unlocked ? trophy.color : null">{{ trophy.label }}</div>
+                    <div class="trophy-desc small-text">{{ trophy.desc }}</div>
+                    @if (trophy.unlocked && trophy.detail) {
+                      <div class="trophy-detail">{{ trophy.detail }}</div>
+                    }
+                  </div>
+                }
+              </div>
             }
           }
         </section>
@@ -1144,10 +1225,6 @@
                       <div>
                         <label class="label">Powerplay Margin</label>
                         <div class="input" style="display: flex; align-items: center; min-height: 42px;">{{ getAdminPowerplayMargin() }}</div>
-                      </div>
-                      <div>
-                        <label class="label">Total Wickets Fallen</label>
-                        <input class="input" type="number" [ngModel]="adminResultDraft().totalWickets" (ngModelChange)="updateAdminResult('totalWickets', +$event)" />
                       </div>
                       <div>
                         <label class="label">Wickets Range</label>

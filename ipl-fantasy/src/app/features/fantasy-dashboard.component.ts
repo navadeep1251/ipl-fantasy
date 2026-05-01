@@ -16,9 +16,11 @@ import {
   buildLiveLeaderboard,
   buildOverallLeaderboard,
   calculateScore,
+  computeTrophies,
   getMatchStatus,
   isMatchLocked,
   getUniqueMatchPlayers,
+  TROPHY_DEFS,
   triggerInsightsUpdate,
 } from '../core/fantasy.utils';
 import {
@@ -252,6 +254,74 @@ export class FantasyDashboardComponent {
 
   readonly overallLeaderboard = computed(() => buildOverallLeaderboard(this.matches(), this.selections(), this.results(), this.playerScores()));
   readonly consolidated = computed(() => buildConsolidatedTable(this.matches(), this.selections(), this.results(), this.playerScores()));
+
+  readonly trophyDefs = TROPHY_DEFS;
+  readonly selectedTrophyPlayer = signal<string>('');
+
+  readonly allTrophyCabinets = computed(() => {
+    const board = this.overallLeaderboard();
+    const total = board.length;
+    return FANTASY_PLAYERS.map((name) => {
+      const rank = board.findIndex((e) => e.name === name) + 1 || total;
+      const trophies = computeTrophies(
+        name,
+        this.matches(),
+        this.results(),
+        this.selections(),
+        this.playerScores(),
+        rank,
+        total,
+      );
+      return { name, rank, trophies };
+    });
+  });
+
+  readonly activeTrophyPlayer = computed(() => {
+    const selected = this.selectedTrophyPlayer();
+    const entries = this.allTrophyCabinets();
+    if (selected) return entries.find((e) => e.name === selected) ?? entries[0] ?? null;
+    const currentUser = this.user();
+    if (currentUser) return entries.find((e) => e.name === currentUser.displayName) ?? entries[0] ?? null;
+    return entries[0] ?? null;
+  });
+
+  private static readonly PIE_COLORS = [
+    '#00e5a0', '#ff6b6b', '#4dabf7', '#ffd43b', '#cc5de8',
+    '#ff922b', '#51cf66', '#f783ac', '#20c997', '#748ffc',
+    '#e64d4d', '#9b59b6', '#1abc9c', '#e67e22', '#3498db',
+  ];
+
+  readonly livePickDistributions = computed(() => {
+    const matchId = this.liveUpdateMatchId();
+    if (!matchId) return null;
+
+    const allSelections = this.selections();
+
+    const categories: { key: keyof SelectionRecord; label: string; isTeam: boolean }[] = [
+      { key: 'winningTeam', label: 'Winning Team', isTeam: true },
+      { key: 'bestBatsman', label: 'Best Batsman', isTeam: false },
+      { key: 'bestBowler', label: 'Best Bowler', isTeam: false },
+      { key: 'doubleCategory', label: 'Double Category', isTeam: false },
+      { key: 'winningHorse', label: '🏆 Winning Horse', isTeam: false },
+      { key: 'losingHorse', label: '💀 Losing Horse', isTeam: false },
+    ];
+
+    return categories.map(({ key, label, isTeam }) => {
+      const counts: Record<string, number> = {};
+      Object.values(allSelections).forEach((userSelections) => {
+        const pick = userSelections[matchId]?.[key];
+        if (pick && typeof pick === 'string') {
+          counts[pick] = (counts[pick] ?? 0) + 1;
+        }
+      });
+
+      const entries: [string, number][] = Object.entries(counts).sort((a, b) => b[1] - a[1]);
+      const total = entries.reduce((sum, [, n]) => sum + n, 0);
+      const slices = this.buildPieSlices(entries, total, isTeam);
+
+      return { key, label, entries, total, slices };
+    });
+  });
 
   readonly myStats = computed(() => {
     const currentUser = this.user();
@@ -1008,6 +1078,39 @@ export class FantasyDashboardComponent {
   }
 
   trackByName = (_: number, name: string) => name;
+
+  getTrophyUnlockedCount(cabinet: ReturnType<typeof computeTrophies>): number {
+    return cabinet.filter((t) => t.unlocked).length;
+  }
+
+  buildPieSlices(entries: [string, number][], total: number, isTeam: boolean) {
+    if (!total) return [];
+    const cx = 100, cy = 100, outerR = 80, innerR = 55;
+    let angle = -Math.PI / 2;
+
+    return entries.map(([name, count], i) => {
+      const fraction = count / total;
+      const sweep = entries.length === 1 ? 0.9999 : fraction;
+      const startAngle = angle;
+      const endAngle = angle + sweep * 2 * Math.PI;
+      angle += fraction * 2 * Math.PI;
+
+      const cos = Math.cos, sin = Math.sin;
+      const x1 = cx + outerR * cos(startAngle), y1 = cy + outerR * sin(startAngle);
+      const x2 = cx + outerR * cos(endAngle),   y2 = cy + outerR * sin(endAngle);
+      const ix1 = cx + innerR * cos(endAngle),  iy1 = cy + innerR * sin(endAngle);
+      const ix2 = cx + innerR * cos(startAngle), iy2 = cy + innerR * sin(startAngle);
+      const large = sweep > 0.5 ? 1 : 0;
+      const f = (n: number) => n.toFixed(2);
+
+      const d = `M ${f(x1)} ${f(y1)} A ${outerR} ${outerR} 0 ${large} 1 ${f(x2)} ${f(y2)} L ${f(ix1)} ${f(iy1)} A ${innerR} ${innerR} 0 ${large} 0 ${f(ix2)} ${f(iy2)} Z`;
+      const color = isTeam
+        ? (this.teamMeta[name]?.color ?? FantasyDashboardComponent.PIE_COLORS[i % FantasyDashboardComponent.PIE_COLORS.length])
+        : FantasyDashboardComponent.PIE_COLORS[i % FantasyDashboardComponent.PIE_COLORS.length];
+
+      return { name, count, d, color };
+    });
+  }
 
   private restoreSession(): SessionUser | null {
     const SESSION_TTL = 3 * 24 * 60 * 60 * 1000; // 3 days
