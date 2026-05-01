@@ -13,3 +13,6 @@ ipl-fantasy/out-tsc/
 # Logs
 npm-debug.log*
 yarn-error.log*
+
+# Build output
+ipl-fantasy/scripts/one.js
