@@ -304,7 +304,7 @@
           <div class="toolbar" style="justify-content: space-between; align-items: flex-start;">
             <div>
               <h1 class="heading">Matches</h1>
-              <p class="section-subtitle">IPL 2026 · 70 matches</p>
+              <p class="section-subtitle">IPL 2026 · 74 matches</p>
             </div>
             <div class="tab-strip">
               @for (filter of ['all', 'open', 'locked', 'completed']; track filter) {
@@ -955,15 +955,11 @@
                       @for (col of pickColumns; track col.key) {
                         <th>{{ col.label }}</th>
                       }
-                      <th style="color: #4CAF50; font-weight: 600;">Submitted</th>
-                      <th>Actions</th>
                     </tr>
                   </thead>
                   <tbody>
                     @for (player of fantasyPlayers; track player) {
                       @let savedPick = selections()[player.toLowerCase().replaceAll(' ', '_')]?.[picksMatch()!.id];
-                      @let timestamp = getSelectionTimestamp(player, picksMatch()!.id);
-                      @let isSubmitted = isSelectionMade(player, picksMatch()!.id);
                       <tr>
                         <td class="sticky">{{ player }}</td>
                         @for (col of pickColumns; track col.key) {
@@ -984,9 +980,6 @@
                             }
                           </td>
                         }
-                        <td [style.color]="isSubmitted ? '#4CAF50' : '#f44336'" style="font-weight: 600;">
-                          {{ formatTimestamp(timestamp) }}
-                        </td>
                         <td>
                           @if (picksEditingPlayer() === player) {
                             <div class="toolbar">

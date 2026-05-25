@@ -242,7 +242,7 @@ export class DataService {
       );
     }
 
-    if (!remoteMatches.length) {
+    if (seedMatches.length) {
       await this.supabase.upsert(
         'matches',
         seedMatches.map((match) => ({
@@ -648,6 +648,7 @@ export class DataService {
         doubleCategory: row.double_category,
         winningHorse: row.winning_horse,
         losingHorse: row.losing_horse,
+        created_at: row.saved_at,
       };
     }
     return selections;

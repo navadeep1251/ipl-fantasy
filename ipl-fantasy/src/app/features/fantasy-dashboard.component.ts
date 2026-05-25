@@ -197,9 +197,9 @@ export class FantasyDashboardComponent {
     const now = this.now();
     const filter = this.adminMatchFilter();
     const results = this.results();
-    
+
     let filtered = [...this.matches()];
-    
+
     if (filter !== 'all') {
       filtered = filtered.filter((match) => {
         if (results[match.id]) return filter === 'completed';
@@ -207,12 +207,12 @@ export class FantasyDashboardComponent {
         return filter === 'open';
       });
     }
-    
+
     // Sort by filter type: completed/locked latest first (descending), open earliest first (ascending)
     if (filter === 'completed' || filter === 'locked') {
       return filtered.sort((a, b) => b.id - a.id);
     }
-    
+
     return filtered.sort((a, b) => a.id - b.id);
   });
   readonly picksVisibleMatches = computed(() => {
@@ -587,6 +587,17 @@ export class FantasyDashboardComponent {
     const username = normalizeFantasyUsername(playerName);
     const selection = this.selections()[username]?.[matchId];
     return selection?.created_at || null;
+  }
+
+  getSelectionTimestampColor(playerName: string, matchId: number): string {
+    const timestamp = this.getSelectionTimestamp(playerName, matchId);
+    const match = this.matches().find((row) => row.id === matchId);
+
+    if (!timestamp || !match) {
+      return '#f44336';
+    }
+
+    return new Date(timestamp).getTime() <= new Date(match.lock_time).getTime() ? '#4CAF50' : '#f44336';
   }
 
   formatTimestamp(timestamp: string | null | undefined): string {

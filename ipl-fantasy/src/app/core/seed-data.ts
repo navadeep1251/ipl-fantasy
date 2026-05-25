@@ -108,6 +108,10 @@ const seedMatchRows: Array<[number, string, string, string, string, string]> = [
   [68, 'LSG', 'PBKS', 'May 23, 2026', '7:30 PM IST', '2026-05-23T19:30:00+05:30'],
   [69, 'MI', 'RR', 'May 24, 2026', '3:30 PM IST', '2026-05-24T15:30:00+05:30'],
   [70, 'KKR', 'DC', 'May 24, 2026', '7:30 PM IST', '2026-05-24T19:30:00+05:30'],
+  [71, 'RCB', 'GT', 'May 26, 2026', '7:30 PM IST', '2026-05-26T19:30:00+05:30'],
+  [72, 'SRH', 'RR', 'May 27, 2026', '7:30 PM IST', '2026-05-27T19:30:00+05:30'],
+  [73, 'GT', 'SRH', 'May 29, 2026', '7:30 PM IST', '2026-05-29T19:30:00+05:30'],
+  [74, 'RCB', 'SRH', 'May 31, 2026', '7:30 PM IST', '2026-05-31T19:30:00+05:30'],
 ];
 
 export const seedMatches: SeedMatch[] = seedMatchRows.map(([id, home, away, date, time_label, lock_time]) => ({
