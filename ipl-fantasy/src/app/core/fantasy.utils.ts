@@ -13,6 +13,18 @@ import { FANTASY_PLAYERS, TEAM_PLAYERS, scoreKeyFromDoubleCategory } from './ipl
 const FIRST_PLACE_PRIZE = 3;
 const SECOND_PLACE_PRIZE = 2;
 
+function getPrizeAmounts(matchId: number): { first: number; second: number } {
+  if (matchId >= 71 && matchId <= 73) {
+    return { first: 15, second: 10 };
+  }
+
+  if (matchId === 74) {
+    return { first: 35, second: 15 };
+  }
+
+  return { first: FIRST_PLACE_PRIZE, second: SECOND_PLACE_PRIZE };
+}
+
 export function isMatchLocked(match: MatchRecord, now: Date): boolean {
   if (match.manual_lock_state === 1) {
     return true;
@@ -223,6 +235,7 @@ export function buildConsolidatedTable(
     });
 
     const top = rows[0]?.pts ?? 0;
+    const prizes = getPrizeAmounts(match.id);
     if (top > 0) {
       const first = rows.filter((row) => row.pts === top);
       let second: Array<{ player: string; pts: number }> = [];
@@ -234,15 +247,15 @@ export function buildConsolidatedTable(
       }
 
       if (first.length === 2) {
-        const split = Number(((FIRST_PLACE_PRIZE + SECOND_PLACE_PRIZE) / first.length).toFixed(2));
+        const split = Number(((prizes.first + prizes.second) / first.length).toFixed(2));
         first.forEach((row) => (winningsByPlayer[row.player][match.id] = split));
       } else if (first.length > 2) {
-        const split = Number(((FIRST_PLACE_PRIZE + SECOND_PLACE_PRIZE) / first.length).toFixed(2));
+        const split = Number(((prizes.first + prizes.second) / first.length).toFixed(2));
         first.forEach((row) => (winningsByPlayer[row.player][match.id] = split));
       } else if (first.length === 1) {
-        winningsByPlayer[first[0].player][match.id] = FIRST_PLACE_PRIZE;
+        winningsByPlayer[first[0].player][match.id] = prizes.first;
         if (second.length) {
-          const split = Number((SECOND_PLACE_PRIZE / second.length).toFixed(2));
+          const split = Number((prizes.second / second.length).toFixed(2));
           second.forEach((row) => (winningsByPlayer[row.player][match.id] = split));
         }
       }
