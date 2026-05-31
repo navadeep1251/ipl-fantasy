@@ -162,7 +162,11 @@ export class DataService {
 
   async setMatchManualLockState(matchId: number, manualLockState: number | null): Promise<void> {
     await this.ensureRemoteSeedData().catch(() => undefined);
-    await this.supabase.update('matches', { manual_lock_state: manualLockState }, { id: matchId });
+    try {
+      await this.supabase.update('matches', { manual_lock_state: manualLockState }, { id: matchId });
+    } catch {
+      // Keep admin lock controls usable in offline/limited-sync mode.
+    }
     await this.sqlite.run('UPDATE matches SET manual_lock_state = ? WHERE id = ?', [manualLockState, matchId]);
   }
 
