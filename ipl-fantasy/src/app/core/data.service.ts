@@ -15,6 +15,15 @@ import { seedMatches, seedUsers } from './seed-data';
 import { SQLiteService } from './sqlite.service';
 import { SupabaseService } from './supabase.service';
 
+const MATCH_FIXTURE_OVERRIDES: Record<number, { home: string; away: string }> = {
+  73: { home: 'RR', away: 'GT' },
+  74: { home: 'GT', away: 'RCB' },
+};
+
+// const MATCH_LOCK_OVERRIDES: Record<number, number | null> = {
+//   74: 0,
+// };
+
 interface DashboardPayload {
   matches: MatchRecord[];
   results: ResultMap;
@@ -684,10 +693,13 @@ export class DataService {
   }
 
   private mapMatchRow(row: MatchRow): MatchRecord {
+    const fixtureOverride = MATCH_FIXTURE_OVERRIDES[row.id];
+    // const manualLockOverride = MATCH_LOCK_OVERRIDES[row.id];
+
     return {
       id: row.id,
-      home: row.home,
-      away: row.away,
+      home: fixtureOverride?.home ?? row.home,
+      away: fixtureOverride?.away ?? row.away,
       date: row.date,
       time_label: row.time_label,
       lock_time: row.lock_time,
