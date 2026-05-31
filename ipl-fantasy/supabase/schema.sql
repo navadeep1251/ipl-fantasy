@@ -103,12 +103,54 @@ grant select, insert, update, delete on public.selections to anon, authenticated
 grant select, insert, update, delete on public.match_insights to anon, authenticated;
 grant select, insert, update, delete on public.player_scores to anon, authenticated;
 
-alter table public.users disable row level security;
-alter table public.matches disable row level security;
-alter table public.results disable row level security;
-alter table public.selections disable row level security;
-alter table public.match_insights disable row level security;
-alter table public.player_scores disable row level security;
+alter table public.users enable row level security;
+alter table public.matches enable row level security;
+alter table public.results enable row level security;
+alter table public.selections enable row level security;
+alter table public.match_insights enable row level security;
+alter table public.player_scores enable row level security;
+
+drop policy if exists users_all_access on public.users;
+create policy users_all_access on public.users
+for all
+to anon, authenticated
+using (true)
+with check (true);
+
+drop policy if exists matches_all_access on public.matches;
+create policy matches_all_access on public.matches
+for all
+to anon, authenticated
+using (true)
+with check (true);
+
+drop policy if exists results_all_access on public.results;
+create policy results_all_access on public.results
+for all
+to anon, authenticated
+using (true)
+with check (true);
+
+drop policy if exists selections_all_access on public.selections;
+create policy selections_all_access on public.selections
+for all
+to anon, authenticated
+using (true)
+with check (true);
+
+drop policy if exists match_insights_all_access on public.match_insights;
+create policy match_insights_all_access on public.match_insights
+for all
+to anon, authenticated
+using (true)
+with check (true);
+
+drop policy if exists player_scores_all_access on public.player_scores;
+create policy player_scores_all_access on public.player_scores
+for all
+to anon, authenticated
+using (true)
+with check (true);
 
 do $$
 begin

@@ -14,6 +14,9 @@ export class SupabaseService {
       autoRefreshToken: false,
     },
   });
+  private readonly retryableStatuses = new Set([408, 425, 429, 500, 502, 503, 504]);
+  private readonly maxRetries = 3;
+  private readonly retryDelaysMs = [300, 900, 1800];
 
   async query<T>(table: string, options: { select?: string; eq?: Record<string, string | number>; order?: string } = {}): Promise<T[]> {
     let url = `${this.baseUrl}/rest/v1/${table}?`;
@@ -32,12 +35,12 @@ export class SupabaseService {
       url += `order=${options.order}&`;
     }
 
-    const response = await fetch(url, { headers: this.headers() });
+    const response = await this.fetchWithRetry(url, { headers: this.headers() });
     return this.readResponse<T[]>(response);
   }
 
   async upsert<T>(table: string, payload: unknown, onConflict: string): Promise<T[]> {
-    const response = await fetch(`${this.baseUrl}/rest/v1/${table}?on_conflict=${onConflict}`, {
+    const response = await this.fetchWithRetry(`${this.baseUrl}/rest/v1/${table}?on_conflict=${onConflict}`, {
       method: 'POST',
       headers: {
         ...this.headers(),
@@ -56,7 +59,7 @@ export class SupabaseService {
       url += `${key}=eq.${encodeURIComponent(value)}&`;
     }
 
-    const response = await fetch(url, {
+    const response = await this.fetchWithRetry(url, {
       method: 'PATCH',
       headers: {
         ...this.headers(),
@@ -75,7 +78,7 @@ export class SupabaseService {
       url += `${key}=eq.${encodeURIComponent(value)}&`;
     }
 
-    const response = await fetch(url, {
+    const response = await this.fetchWithRetry(url, {
       method: 'DELETE',
       headers: {
         ...this.headers(),
@@ -131,6 +134,34 @@ export class SupabaseService {
     } catch {}
 
     throw new Error(`Supabase request failed (${response.status}): ${detail}`);
+  }
+
+  private async fetchWithRetry(url: string, init: RequestInit): Promise<Response> {
+    let lastError: unknown;
+
+    for (let attempt = 0; attempt <= this.maxRetries; attempt += 1) {
+      try {
+        const response = await fetch(url, init);
+        if (!this.retryableStatuses.has(response.status) || attempt === this.maxRetries) {
+          return response;
+        }
+      } catch (error) {
+        lastError = error;
+        if (attempt === this.maxRetries) {
+          break;
+        }
+      }
+
+      await this.wait(this.retryDelaysMs[Math.min(attempt, this.retryDelaysMs.length - 1)]);
+    }
+
+    throw lastError instanceof Error ? lastError : new Error('Supabase request failed: network error');
+  }
+
+  private wait(ms: number): Promise<void> {
+    return new Promise((resolve) => {
+      window.setTimeout(resolve, ms);
+    });
   }
 
   private headers(): HeadersInit {

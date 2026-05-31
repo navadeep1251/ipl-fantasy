@@ -128,12 +128,20 @@ export class DataService {
 
   async saveResult(matchId: number, result: MatchResult): Promise<void> {
     const row = this.resultToRow(matchId, result);
-    await this.supabase.upsert('results', row, 'match_id');
+    try {
+      await this.supabase.upsert('results', row, 'match_id');
+    } catch {
+      // Allow local progress when remote API is temporarily unavailable.
+    }
     await this.cacheResults([row]);
   }
 
   async savePlayerScores(matchId: number, playerScores: PlayerScore[]): Promise<void> {
-    await Promise.all(playerScores.map((playerScore) => this.supabase.upsert('player_scores', playerScore, 'match_id,player_name')));
+    try {
+      await Promise.all(playerScores.map((playerScore) => this.supabase.upsert('player_scores', playerScore, 'match_id,player_name')));
+    } catch {
+      // Allow local progress when remote API is temporarily unavailable.
+    }
     await this.cachePlayerScores(playerScores);
   }
 
@@ -156,7 +164,11 @@ export class DataService {
 
   async resetPassword(username: string, password: string): Promise<void> {
     const normalizedUsername = normalizeFantasyUsername(username.trim());
-    await this.supabase.update('users', { password }, { username: normalizedUsername });
+    try {
+      await this.supabase.update('users', { password }, { username: normalizedUsername });
+    } catch {
+      // Keep password reset working in local/offline mode.
+    }
     await this.sqlite.run('UPDATE users SET password = ? WHERE username = ?', [password, normalizedUsername]);
   }
 
@@ -382,7 +394,11 @@ export class DataService {
       saved_at: new Date().toISOString(),
     };
 
-    await this.supabase.upsert('selections', payload, 'username,match_id');
+    try {
+      await this.supabase.upsert('selections', payload, 'username,match_id');
+    } catch {
+      // Keep selection saves available while remote API recovers.
+    }
     await this.cacheSelections([payload]);
   }
 
