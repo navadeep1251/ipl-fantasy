@@ -225,8 +225,36 @@ export class FantasyDashboardComponent {
         return lockTime > now && lockTime <= next24h;
       })
       .sort((a, b) => new Date(a.lock_time).getTime() - new Date(b.lock_time).getTime());
-    return [...upcoming, ...this.lockedMatches()];
+
+    const carryOverUnlocked = this.matches()
+      .filter((match) => {
+        if (this.results()[match.id]) return false;
+        if (match.manual_lock_state !== 0) return false;
+        return new Date(match.lock_time).getTime() <= now.getTime();
+      })
+      .sort((a, b) => b.id - a.id);
+
+    const combined = [...upcoming, ...carryOverUnlocked, ...this.lockedMatches()];
+    const seen = new Set<number>();
+    return combined.filter((match) => {
+      if (seen.has(match.id)) return false;
+      seen.add(match.id);
+      return true;
+    });
   });
+
+  readonly liveVisibleMatches = computed(() => {
+    const now = this.now();
+    return this.matches()
+      .filter((match) => {
+        if (this.results()[match.id] || isMatchLocked(match, now)) {
+          return true;
+        }
+        return match.manual_lock_state === 0 && new Date(match.lock_time).getTime() <= now.getTime();
+      })
+      .sort((a, b) => b.id - a.id);
+  });
+
   readonly currentMatchPlayers = computed(() => (this.selectedMatch() ? getUniqueMatchPlayers(this.selectedMatch()!) : []));
   readonly selectedMatchScore = computed(() => {
     const match = this.selectedMatch();

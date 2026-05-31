@@ -484,7 +484,7 @@
             <label class="label">Select Match</label>
             <select class="select" [ngModel]="liveUpdateMatchId() ?? ''" (ngModelChange)="openLiveUpdateMatch($event)" style="max-width: 400px;">
               <option value="">-- Select a match --</option>
-              @for (match of lockedMatches(); track match.id) {
+              @for (match of liveVisibleMatches(); track match.id) {
                 <option [value]="match.id">M{{ match.id }}: {{ match.home }} vs {{ match.away }} — {{ match.date }}</option>
               }
             </select>
