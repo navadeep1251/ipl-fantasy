@@ -406,65 +406,153 @@
         </section>
       } @else if (activeTab() === 'selections') {
         <section class="page stack">
-          <div>
-            <h1 class="heading">Picks</h1>
-            <p class="section-subtitle">View player selections — next 24 hours and locked matches</p>
-          </div>
+          @if (picksSectionTab() === 'ipl') {
+            <div>
+              <h1 class="heading">Picks</h1>
+              <p class="section-subtitle">View player selections — next 24 hours and locked matches</p>
+            </div>
 
-          <div>
-            <label class="label">Select Match</label>
-            <select class="select" [ngModel]="picksMatchId() ?? ''" (ngModelChange)="openPicksMatch($event)">
-              <option value="">-- Select a match --</option>
-              @for (match of picksVisibleMatches(); track match.id) {
-                <option [value]="match.id">{{ getPicksMatchOptionLabel(match) }}</option>
-              }
-            </select>
-          </div>
+            <div>
+              <label class="label">Select Match</label>
+              <select class="select" [ngModel]="picksMatchId() ?? ''" (ngModelChange)="openPicksMatch($event)">
+                <option value="">-- Select a match --</option>
+                @for (match of picksVisibleMatches(); track match.id) {
+                  <option [value]="match.id">{{ getPicksMatchOptionLabel(match) }}</option>
+                }
+              </select>
+            </div>
 
-          @if (picksSavedMessage()) {
-            <div class="success-text">✓ {{ picksSavedMessage() }}</div>
-          }
+            @if (picksSavedMessage()) {
+              <div class="success-text">✓ {{ picksSavedMessage() }}</div>
+            }
 
-          @if (picksMatch()) {
-            <div class="blue-text">📋 {{ submittedPlayersForPicksMatch().length }}/{{ fantasyPlayers.length }} players submitted for M{{ picksMatch()!.id }}: {{ picksMatch()!.home }} vs {{ picksMatch()!.away }}</div>
+            @if (picksMatch()) {
+              <div class="blue-text">📋 {{ submittedPlayersForPicksMatch().length }}/{{ fantasyPlayers.length }} players submitted for M{{ picksMatch()!.id }}: {{ picksMatch()!.home }} vs {{ picksMatch()!.away }}</div>
 
-            <div class="table-wrap">
-              <table class="table">
-                <thead>
-                  <tr>
-                    <th class="sticky">Player</th>
-                    @for (col of pickColumns; track col.key) {
-                      <th>{{ col.label }}</th>
-                    }
-                  </tr>
-                </thead>
-                <tbody>
-                  @for (player of fantasyPlayers; track player) {
-                    @let savedPick = selections()[player.toLowerCase().replaceAll(' ', '_')]?.[picksMatch()!.id];
+              <div class="table-wrap">
+                <table class="table">
+                  <thead>
                     <tr>
-                      <td class="sticky">
-                        {{ player }}
-                        @if (savedPick) {
-                          <span class="success-text"> ✓</span>
-                        }
-                      </td>
+                      <th class="sticky">Player</th>
                       @for (col of pickColumns; track col.key) {
-                        <td>
-                          @if (!picksMatchLocked() && col.key !== 'winningTeam') {
-                            🔒
-                          } @else {
-                            {{ savedPick?.[col.key] || '—' }}
-                          }
-                        </td>
+                        <th>{{ col.label }}</th>
                       }
                     </tr>
-                  }
-                </tbody>
-              </table>
-            </div>
+                  </thead>
+                  <tbody>
+                    @for (player of fantasyPlayers; track player) {
+                      @let savedPick = selections()[player.toLowerCase().replaceAll(' ', '_')]?.[picksMatch()!.id];
+                      <tr>
+                        <td class="sticky">
+                          {{ player }}
+                          @if (savedPick) {
+                            <span class="success-text"> ✓</span>
+                          }
+                        </td>
+                        @for (col of pickColumns; track col.key) {
+                          <td>
+                            @if (!picksMatchLocked() && col.key !== 'winningTeam') {
+                              🔒
+                            } @else {
+                              {{ savedPick?.[col.key] || '—' }}
+                            }
+                          </td>
+                        }
+                      </tr>
+                    }
+                  </tbody>
+                </table>
+              </div>
+            } @else {
+              <div class="card centered muted">Select a match above to view player selections</div>
+            }
           } @else {
-            <div class="card centered muted">Select a match above to view player selections</div>
+            <div>
+              <h1 class="heading">Soccer Fantasy</h1>
+              <p class="section-subtitle">Pick the winner for each soccer game. Picks lock exactly at game time.</p>
+            </div>
+
+            @if (soccerSavedMessage()) {
+              <div class="success-text">✓ {{ soccerSavedMessage() }}</div>
+            }
+
+            <div class="soccer-fixture-grid">
+              @for (fixture of soccerFixtures; track fixture.id) {
+                <div class="card stack soccer-pick-card">
+                  <div class="toolbar soccer-pick-head">
+                    <div class="stack soccer-pick-title-wrap">
+                      <div class="soccer-pick-title">{{ fixture.home }} vs {{ fixture.away }}</div>
+                      <div class="small-text soccer-deadline">{{ fixture.dateLabel }} • {{ fixture.timeLabel }}</div>
+                    </div>
+                    <span class="status-pill" [class.locked]="isSoccerFixtureLocked(fixture)" [class.open]="!isSoccerFixtureLocked(fixture)">
+                      {{ getSoccerLockStatusLabel(fixture) }}
+                    </span>
+                  </div>
+
+                  <div>
+                    <label class="label">Your Winner Pick</label>
+                    <select class="select"
+                      [ngModel]="soccerDraft()[fixture.id] || ''"
+                      (ngModelChange)="updateSoccerDraft(fixture.id, $event)"
+                      [disabled]="isSoccerFixtureLocked(fixture)">
+                      <option value="">-- Select winner --</option>
+                      <option [value]="fixture.home">{{ fixture.home }}</option>
+                      <option [value]="fixture.away">{{ fixture.away }}</option>
+                    </select>
+                  </div>
+
+                  <div class="toolbar soccer-pick-actions">
+                    <span class="small-text">
+                      Your saved pick: <strong class="gold-text">{{ getCurrentUserSoccerPick(fixture.id) || '—' }}</strong>
+                    </span>
+                    <button class="button primary"
+                      (click)="saveSoccerPick(fixture)"
+                      [disabled]="isSoccerFixtureLocked(fixture) || soccerSavingFixtureId() === fixture.id || !(soccerDraft()[fixture.id])">
+                      {{ soccerSavingFixtureId() === fixture.id ? 'Saving...' : 'Save Pick' }}
+                    </button>
+                  </div>
+                </div>
+              }
+            </div>
+
+            <div class="card stack">
+              <div class="section-title">Locked Picks By Player</div>
+              <div class="small-text soccer-locked-note">Picks are revealed for everyone only after each fixture lock time.</div>
+              <div class="table-wrap">
+                <table class="table">
+                  <thead>
+                    <tr>
+                      <th class="sticky">Player</th>
+                      @for (fixture of soccerFixtures; track fixture.id) {
+                        <th>{{ fixture.home }} vs {{ fixture.away }}</th>
+                      }
+                    </tr>
+                  </thead>
+                  <tbody>
+                    @for (player of fantasyPlayers; track player) {
+                      <tr>
+                        <td class="sticky">{{ player }}</td>
+                        @for (fixture of soccerFixtures; track fixture.id) {
+                          <td>
+                            @if (isSoccerFixtureLocked(fixture)) {
+                              {{ getSoccerPickForUser(player, fixture.id) || '—' }}
+                            } @else {
+                              🔒
+                            }
+                          </td>
+                        }
+                      </tr>
+                    }
+                  </tbody>
+                </table>
+              </div>
+            </div>
           }
+
+          <div class="bottom-tab-strip">
+            <button class="tab-button" [class.active]="picksSectionTab() === 'ipl'" (click)="setPicksSectionTab('ipl')">🏏 IPL Picks</button>
+            <button class="tab-button" [class.active]="picksSectionTab() === 'soccer'" (click)="setPicksSectionTab('soccer')">⚽ Soccer Fantasy</button>
+          </div>
         </section>
       } @else if (activeTab() === 'live') {
         <section class="page stack">

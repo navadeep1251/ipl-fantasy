@@ -45,6 +45,37 @@ interface UserRow {
   is_admin: boolean;
 }
 
+interface SoccerFixture {
+  id: string;
+  home: string;
+  away: string;
+  dateLabel: string;
+  timeLabel: string;
+  lockTime: string;
+}
+
+type SoccerPickMap = Record<string, Record<string, { team: string; savedAt: string }>>;
+
+const SOCCER_PICK_STORAGE_KEY = 'ipl-fantasy.soccer-picks.v1';
+const SOCCER_FIXTURES: SoccerFixture[] = [
+  {
+    id: 'soccer-france-spain-2026-07-14',
+    home: 'France',
+    away: 'Spain',
+    dateLabel: 'July 14, 2026',
+    timeLabel: '3:00 PM EST',
+    lockTime: '2026-07-14T15:00:00-05:00',
+  },
+  {
+    id: 'soccer-argentina-england-2026-07-15',
+    home: 'Argentina',
+    away: 'England',
+    dateLabel: 'July 15, 2026',
+    timeLabel: '3:00 PM EST',
+    lockTime: '2026-07-15T15:00:00-05:00',
+  },
+];
+
 @Component({
   selector: 'app-fantasy-dashboard',
   standalone: true,
@@ -113,6 +144,12 @@ export class FantasyDashboardComponent {
   readonly picksDraft = signal<SelectionRecord>({ ...EMPTY_SELECTION });
   readonly picksSaving = signal(false);
   readonly picksSavedMessage = signal('');
+  readonly picksSectionTab = signal<'ipl' | 'soccer'>('ipl');
+  readonly soccerFixtures = SOCCER_FIXTURES;
+  readonly soccerPicks = signal<SoccerPickMap>(this.restoreSoccerPicks());
+  readonly soccerDraft = signal<Record<string, string>>({});
+  readonly soccerSavingFixtureId = signal<string | null>(null);
+  readonly soccerSavedMessage = signal('');
 
   readonly liveUpdateMatchId = signal<number | null>(null);
   readonly liveDrafts = signal<Record<string, PlayerScoreDraft>>({});
@@ -448,6 +485,22 @@ export class FantasyDashboardComponent {
         this.loadUsers();
       }
     });
+
+    effect(() => {
+      const currentUser = this.user();
+      const picks = this.soccerPicks();
+      if (!currentUser) {
+        this.soccerDraft.set({});
+        return;
+      }
+
+      const nextDraft: Record<string, string> = {};
+      const userPicks = picks[currentUser.username] ?? {};
+      for (const fixture of this.soccerFixtures) {
+        nextDraft[fixture.id] = userPicks[fixture.id]?.team ?? '';
+      }
+      this.soccerDraft.set(nextDraft);
+    });
   }
 
   ngOnDestroy(): void {
@@ -782,6 +835,76 @@ export class FantasyDashboardComponent {
     this.picksMatchId.set(matchId);
     this.picksEditingPlayer.set(null);
     this.picksSavedMessage.set('');
+  }
+
+  setPicksSectionTab(tab: 'ipl' | 'soccer') {
+    this.picksSectionTab.set(tab);
+    this.picksSavedMessage.set('');
+    this.soccerSavedMessage.set('');
+  }
+
+  isSoccerFixtureLocked(fixture: SoccerFixture, now = this.now()) {
+    return now.getTime() >= new Date(fixture.lockTime).getTime();
+  }
+
+  getSoccerLockStatusLabel(fixture: SoccerFixture) {
+    return this.isSoccerFixtureLocked(fixture) ? 'Locked' : 'Open';
+  }
+
+  updateSoccerDraft(fixtureId: string, value: string) {
+    this.soccerDraft.update((draft) => ({
+      ...draft,
+      [fixtureId]: value,
+    }));
+  }
+
+  async saveSoccerPick(fixture: SoccerFixture) {
+    const currentUser = this.user();
+    if (!currentUser || this.isSoccerFixtureLocked(fixture)) {
+      return;
+    }
+
+    const pickedTeam = this.soccerDraft()[fixture.id];
+    if (!pickedTeam || (pickedTeam !== fixture.home && pickedTeam !== fixture.away)) {
+      return;
+    }
+
+    this.soccerSavingFixtureId.set(fixture.id);
+    try {
+      this.soccerPicks.update((allPicks) => ({
+        ...allPicks,
+        [currentUser.username]: {
+          ...(allPicks[currentUser.username] ?? {}),
+          [fixture.id]: {
+            team: pickedTeam,
+            savedAt: new Date().toISOString(),
+          },
+        },
+      }));
+      this.persistSoccerPicks();
+      this.soccerSavedMessage.set(`Saved your pick for ${fixture.home} vs ${fixture.away}`);
+      window.setTimeout(() => this.soccerSavedMessage.set(''), 2500);
+    } finally {
+      this.soccerSavingFixtureId.set(null);
+    }
+  }
+
+  getSoccerPickForUser(playerName: string, fixtureId: string): string {
+    const username = normalizeFantasyUsername(playerName);
+    return this.soccerPicks()[username]?.[fixtureId]?.team ?? '';
+  }
+
+  getSoccerSubmittedPlayersForFixture(fixtureId: string): string[] {
+    return this.fantasyPlayers.filter((name) => !!this.getSoccerPickForUser(name, fixtureId));
+  }
+
+  getCurrentUserSoccerPick(fixtureId: string): string {
+    const currentUser = this.user();
+    if (!currentUser) {
+      return '';
+    }
+
+    return this.soccerPicks()[currentUser.username]?.[fixtureId]?.team ?? '';
   }
 
   editPick(playerName: string) {
@@ -1170,6 +1293,30 @@ export class FantasyDashboardComponent {
     } catch {
       return null;
     }
+  }
+
+  private restoreSoccerPicks(): SoccerPickMap {
+    try {
+      const raw = localStorage.getItem(SOCCER_PICK_STORAGE_KEY);
+      if (!raw) {
+        return {};
+      }
+
+      const parsed = JSON.parse(raw);
+      if (!parsed || typeof parsed !== 'object') {
+        return {};
+      }
+
+      return parsed as SoccerPickMap;
+    } catch {
+      return {};
+    }
+  }
+
+  private persistSoccerPicks(): void {
+    try {
+      localStorage.setItem(SOCCER_PICK_STORAGE_KEY, JSON.stringify(this.soccerPicks()));
+    } catch {}
   }
 
   private persistSession(user: SessionUser): void {

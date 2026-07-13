@@ -593,6 +593,68 @@
   background: linear-gradient(90deg, #ff8c00, #fbbf24);
 }
 
+.bottom-tab-strip {
+  display: flex;
+  justify-content: center;
+  gap: 8px;
+  margin-top: 8px;
+  padding-top: 6px;
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.bottom-tab-strip .tab-button {
+  border-radius: 999px;
+  padding: 8px 14px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.04);
+  color: #94a3b8;
+  font-weight: 700;
+}
+
+.bottom-tab-strip .tab-button.active {
+  color: #fbbf24;
+  border-color: rgba(251, 191, 36, 0.45);
+  background: rgba(251, 191, 36, 0.08);
+}
+
+.soccer-fixture-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 14px;
+}
+
+.soccer-pick-card {
+  gap: 14px;
+}
+
+.soccer-pick-head {
+  justify-content: space-between;
+  align-items: flex-start;
+}
+
+.soccer-pick-title-wrap {
+  gap: 4px;
+}
+
+.soccer-pick-title {
+  font-weight: 700;
+  color: #f8fafc;
+}
+
+.soccer-pick-actions {
+  justify-content: space-between;
+  align-items: center;
+}
+
+.soccer-deadline {
+  color: #93c5fd;
+  font-weight: 600;
+}
+
+.soccer-locked-note {
+  margin-bottom: 6px;
+}
+
 @media (max-width: 768px) {
   .team-row,
   .metrics,
