@@ -9,6 +9,7 @@ import {
   ResultMap,
   SelectionMap,
   SelectionRecord,
+  SoccerPickMap,
   SessionUser,
 } from './models';
 import { seedMatches, seedUsers } from './seed-data';
@@ -131,6 +132,37 @@ export class DataService {
     await this.upsertSelection(username, matchId, selection);
   }
 
+  async loadSoccerPicks(): Promise<SoccerPickMap> {
+    await this.ensureRemoteSeedData().catch(() => undefined);
+
+    try {
+      const remoteRows = await this.loadRemoteSoccerPicks();
+      await this.cacheSoccerPicks(remoteRows);
+      return this.mapSoccerPicks(remoteRows);
+    } catch {
+      const localRows = await this.sqlite.all<SoccerPickRow>('SELECT * FROM soccer_picks').catch(() => []);
+      return this.mapSoccerPicks(localRows);
+    }
+  }
+
+  async saveSoccerPick(username: string, fixtureId: string, pickedTeam: string): Promise<void> {
+    const normalizedUsername = normalizeFantasyUsername(username.trim());
+    const payload: SoccerPickRow = {
+      username: normalizedUsername,
+      fixture_id: fixtureId,
+      picked_team: pickedTeam,
+      saved_at: new Date().toISOString(),
+    };
+
+    try {
+      await this.supabase.upsert('soccer_picks', payload, 'username,fixture_id');
+    } catch {
+      // Keep soccer picks available while remote API recovers.
+    }
+
+    await this.cacheSoccerPicks([payload]);
+  }
+
   async saveResult(matchId: number, result: MatchResult): Promise<void> {
     const row = this.resultToRow(matchId, result);
     try {
@@ -237,6 +269,10 @@ export class DataService {
 
   private loadRemotePlayerScores(): Promise<PlayerScore[]> {
     return this.supabase.query<PlayerScore>('player_scores', { select: '*' }).catch(() => []);
+  }
+
+  private loadRemoteSoccerPicks(): Promise<SoccerPickRow[]> {
+    return this.supabase.query<SoccerPickRow>('soccer_picks', { select: 'username,fixture_id,picked_team,saved_at' }).catch(() => []);
   }
 
   private async ensureRemoteSeedData(): Promise<void> {
@@ -636,6 +672,29 @@ export class DataService {
     );
   }
 
+  private async cacheSoccerPicks(rows: SoccerPickRow[]): Promise<void> {
+    if (!rows.length) {
+      return;
+    }
+
+    await this.sqlite.batch(
+      rows.map((row) => ({
+        sql: `INSERT INTO soccer_picks (
+          username, fixture_id, picked_team, saved_at
+        ) VALUES (?, ?, ?, ?)
+        ON CONFLICT(username, fixture_id) DO UPDATE SET
+          picked_team = excluded.picked_team,
+          saved_at = excluded.saved_at`,
+        params: [
+          row.username,
+          row.fixture_id,
+          row.picked_team,
+          row.saved_at ?? new Date().toISOString(),
+        ],
+      })),
+    );
+  }
+
   private mergeSelectionRows(localRows: SelectionRow[], remoteRows: SelectionRow[]): SelectionRow[] {
     const merged = new Map<string, SelectionRow>();
 
@@ -776,6 +835,20 @@ export class DataService {
     return playerScores;
   }
 
+  private mapSoccerPicks(rows: SoccerPickRow[]): SoccerPickMap {
+    const picks: SoccerPickMap = {};
+
+    for (const row of rows || []) {
+      picks[row.username] ??= {};
+      picks[row.username][row.fixture_id] = {
+        team: row.picked_team,
+        savedAt: row.saved_at ?? new Date(0).toISOString(),
+      };
+    }
+
+    return picks;
+  }
+
   private mapMatchRow(row: MatchRow): MatchRecord {
     const fixtureOverride = MATCH_FIXTURE_OVERRIDES[row.id];
     // const manualLockOverride = MATCH_LOCK_OVERRIDES[row.id];
@@ -909,6 +982,13 @@ interface SelectionRow {
   double_category: string;
   winning_horse: string;
   losing_horse: string;
+  saved_at?: string;
+}
+
+interface SoccerPickRow {
+  username: string;
+  fixture_id: string;
+  picked_team: string;
   saved_at?: string;
 }
 

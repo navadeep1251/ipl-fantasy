@@ -104,6 +104,7 @@ export interface ScoreBreakdown {
 
 export type ResultMap = Record<number, MatchResult>;
 export type SelectionMap = Record<string, Record<number, SelectionRecord>>;
+export type SoccerPickMap = Record<string, Record<string, { team: string; savedAt: string }>>;
 export type InsightMap = Record<number, MatchInsights>;
 export type PlayerScoresMap = Record<number, Record<string, PlayerScore>>;
 

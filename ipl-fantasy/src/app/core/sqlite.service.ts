@@ -182,6 +182,14 @@ export class SQLiteService {
         PRIMARY KEY (username, match_id)
       );
 
+      CREATE TABLE IF NOT EXISTS soccer_picks (
+        username TEXT NOT NULL,
+        fixture_id TEXT NOT NULL,
+        picked_team TEXT NOT NULL,
+        saved_at TEXT,
+        PRIMARY KEY (username, fixture_id)
+      );
+
       CREATE TABLE IF NOT EXISTS match_insights (
         match_id INTEGER PRIMARY KEY,
         generated_at TEXT,

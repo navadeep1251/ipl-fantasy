@@ -34,6 +34,7 @@ import {
   PlayerScore,
   PlayerScoreDraft,
   SelectionRecord,
+  SoccerPickMap,
   SessionUser,
 } from '../core/models';
 import { SupabaseService, SupabaseSyncState } from '../core/supabase.service';
@@ -54,9 +55,6 @@ interface SoccerFixture {
   lockTime: string;
 }
 
-type SoccerPickMap = Record<string, Record<string, { team: string; savedAt: string }>>;
-
-const SOCCER_PICK_STORAGE_KEY = 'ipl-fantasy.soccer-picks.v1';
 const SOCCER_FIXTURES: SoccerFixture[] = [
   {
     id: 'soccer-france-spain-2026-07-14',
@@ -146,7 +144,7 @@ export class FantasyDashboardComponent {
   readonly picksSavedMessage = signal('');
   readonly picksSectionTab = signal<'ipl' | 'soccer'>('ipl');
   readonly soccerFixtures = SOCCER_FIXTURES;
-  readonly soccerPicks = signal<SoccerPickMap>(this.restoreSoccerPicks());
+  readonly soccerPicks = signal<SoccerPickMap>({});
   readonly soccerDraft = signal<Record<string, string>>({});
   readonly soccerSavingFixtureId = signal<string | null>(null);
   readonly soccerSavedMessage = signal('');
@@ -539,7 +537,12 @@ export class FantasyDashboardComponent {
   async loadDashboard() {
     this.loading.set(true);
     try {
-      this.applyDashboard(await this.dataService.loadDashboard());
+      const [dashboard, soccerPicks] = await Promise.all([
+        this.dataService.loadDashboard(),
+        this.dataService.loadSoccerPicks(),
+      ]);
+      this.applyDashboard(dashboard);
+      this.soccerPicks.set(soccerPicks);
       if (this.user()) {
         this.setSyncState(this.supabaseSyncState() === 'offline' ? 'offline' : 'connecting');
         this.checkPickReminders();
@@ -555,7 +558,12 @@ export class FantasyDashboardComponent {
     }
 
     try {
-      this.applyDashboard(await this.dataService.loadDashboard());
+      const [dashboard, soccerPicks] = await Promise.all([
+        this.dataService.loadDashboard(),
+        this.dataService.loadSoccerPicks(),
+      ]);
+      this.applyDashboard(dashboard);
+      this.soccerPicks.set(soccerPicks);
       this.touchSession();
     } catch {}
   }
@@ -871,17 +879,18 @@ export class FantasyDashboardComponent {
 
     this.soccerSavingFixtureId.set(fixture.id);
     try {
+      const savedAt = new Date().toISOString();
+      await this.dataService.saveSoccerPick(currentUser.username, fixture.id, pickedTeam);
       this.soccerPicks.update((allPicks) => ({
         ...allPicks,
         [currentUser.username]: {
           ...(allPicks[currentUser.username] ?? {}),
           [fixture.id]: {
             team: pickedTeam,
-            savedAt: new Date().toISOString(),
+            savedAt,
           },
         },
       }));
-      this.persistSoccerPicks();
       this.soccerSavedMessage.set(`Saved your pick for ${fixture.home} vs ${fixture.away}`);
       window.setTimeout(() => this.soccerSavedMessage.set(''), 2500);
     } finally {
@@ -1293,30 +1302,6 @@ export class FantasyDashboardComponent {
     } catch {
       return null;
     }
-  }
-
-  private restoreSoccerPicks(): SoccerPickMap {
-    try {
-      const raw = localStorage.getItem(SOCCER_PICK_STORAGE_KEY);
-      if (!raw) {
-        return {};
-      }
-
-      const parsed = JSON.parse(raw);
-      if (!parsed || typeof parsed !== 'object') {
-        return {};
-      }
-
-      return parsed as SoccerPickMap;
-    } catch {
-      return {};
-    }
-  }
-
-  private persistSoccerPicks(): void {
-    try {
-      localStorage.setItem(SOCCER_PICK_STORAGE_KEY, JSON.stringify(this.soccerPicks()));
-    } catch {}
   }
 
   private persistSession(user: SessionUser): void {

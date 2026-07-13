@@ -64,6 +64,14 @@ create table if not exists public.selections (
   primary key (username, match_id)
 );
 
+create table if not exists public.soccer_picks (
+  username text not null references public.users (username) on delete cascade,
+  fixture_id text not null,
+  picked_team text not null,
+  saved_at timestamptz,
+  primary key (username, fixture_id)
+);
+
 create table if not exists public.match_insights (
   match_id bigint primary key references public.matches (id) on delete cascade,
   generated_at timestamptz,
@@ -100,6 +108,7 @@ grant select, insert, update, delete on public.users to anon, authenticated;
 grant select, insert, update, delete on public.matches to anon, authenticated;
 grant select, insert, update, delete on public.results to anon, authenticated;
 grant select, insert, update, delete on public.selections to anon, authenticated;
+grant select, insert, update, delete on public.soccer_picks to anon, authenticated;
 grant select, insert, update, delete on public.match_insights to anon, authenticated;
 grant select, insert, update, delete on public.player_scores to anon, authenticated;
 
@@ -107,6 +116,7 @@ alter table public.users enable row level security;
 alter table public.matches enable row level security;
 alter table public.results enable row level security;
 alter table public.selections enable row level security;
+alter table public.soccer_picks enable row level security;
 alter table public.match_insights enable row level security;
 alter table public.player_scores enable row level security;
 
@@ -133,6 +143,13 @@ with check (true);
 
 drop policy if exists selections_all_access on public.selections;
 create policy selections_all_access on public.selections
+for all
+to anon, authenticated
+using (true)
+with check (true);
+
+drop policy if exists soccer_picks_all_access on public.soccer_picks;
+create policy soccer_picks_all_access on public.soccer_picks
 for all
 to anon, authenticated
 using (true)
@@ -182,6 +199,17 @@ begin
     where pubname = 'supabase_realtime' and schemaname = 'public' and tablename = 'selections'
   ) then
     alter publication supabase_realtime add table public.selections;
+  end if;
+end $$;
+
+do $$
+begin
+  if not exists (
+    select 1
+    from pg_publication_tables
+    where pubname = 'supabase_realtime' and schemaname = 'public' and tablename = 'soccer_picks'
+  ) then
+    alter publication supabase_realtime add table public.soccer_picks;
   end if;
 end $$;
 
