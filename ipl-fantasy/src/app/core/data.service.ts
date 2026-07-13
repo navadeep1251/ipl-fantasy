@@ -70,25 +70,30 @@ export class DataService {
     await this.ensureRemoteSeedData().catch(() => undefined);
 
     try {
-      const [matches, resultRows, selectionRows, insightRows, playerScoreRows] = await Promise.all([
+      const [matches, resultRows, remoteSelectionRows, insightRows, playerScoreRows, cachedSelectionRows] = await Promise.all([
         this.loadMatches(),
         this.loadRemoteResults(),
         this.loadRemoteSelections(),
         this.loadRemoteInsights(),
         this.loadRemotePlayerScores(),
+        this.sqlite.all<SelectionRow>('SELECT * FROM selections').catch(() => []),
       ]);
+
+      const mergedSelectionRows = this.mergeSelectionRows(cachedSelectionRows, remoteSelectionRows);
 
       await Promise.all([
         this.cacheResults(resultRows),
-        this.cacheSelections(selectionRows),
+        this.cacheSelections(mergedSelectionRows),
         this.cacheInsights(insightRows),
         this.cachePlayerScores(playerScoreRows),
       ]);
 
+      await this.pushLatestSelectionsToRemote(mergedSelectionRows, remoteSelectionRows).catch(() => undefined);
+
       return {
         matches,
         results: this.mapResults(resultRows),
-        selections: this.mapSelections(selectionRows),
+        selections: this.mapSelections(mergedSelectionRows),
         insights: this.mapInsights(insightRows),
         playerScores: this.mapPlayerScores(playerScoreRows),
       };
@@ -629,6 +634,65 @@ export class DataService {
         ],
       })),
     );
+  }
+
+  private mergeSelectionRows(localRows: SelectionRow[], remoteRows: SelectionRow[]): SelectionRow[] {
+    const merged = new Map<string, SelectionRow>();
+
+    for (const row of remoteRows || []) {
+      merged.set(this.selectionKey(row), row);
+    }
+
+    for (const row of localRows || []) {
+      const key = this.selectionKey(row);
+      const current = merged.get(key);
+      if (!current || this.isSelectionRowNewer(row, current)) {
+        merged.set(key, row);
+      }
+    }
+
+    return Array.from(merged.values());
+  }
+
+  private async pushLatestSelectionsToRemote(mergedRows: SelectionRow[], remoteRows: SelectionRow[]): Promise<void> {
+    if (!mergedRows.length) {
+      return;
+    }
+
+    const remoteByKey = new Map<string, SelectionRow>();
+    for (const row of remoteRows || []) {
+      remoteByKey.set(this.selectionKey(row), row);
+    }
+
+    const rowsToPush = mergedRows.filter((row) => {
+      const remote = remoteByKey.get(this.selectionKey(row));
+      return !remote || this.isSelectionRowNewer(row, remote);
+    });
+
+    if (!rowsToPush.length) {
+      return;
+    }
+
+    await this.supabase.upsert('selections', rowsToPush, 'username,match_id');
+  }
+
+  private selectionKey(row: Pick<SelectionRow, 'username' | 'match_id'>): string {
+    return `${row.username}::${row.match_id}`;
+  }
+
+  private isSelectionRowNewer(candidate: SelectionRow, existing: SelectionRow): boolean {
+    const candidateTime = this.safeDateValue(candidate.saved_at);
+    const existingTime = this.safeDateValue(existing.saved_at);
+    return candidateTime >= existingTime;
+  }
+
+  private safeDateValue(value?: string): number {
+    if (!value) {
+      return 0;
+    }
+
+    const timestamp = new Date(value).getTime();
+    return Number.isFinite(timestamp) ? timestamp : 0;
   }
 
   private mapResults(rows: ResultRow[]): ResultMap {

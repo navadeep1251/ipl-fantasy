@@ -778,7 +778,7 @@ export class FantasyDashboardComponent {
       return;
     }
 
-    this.supabaseSyncMessage.set('Offline cache mode');
+    this.supabaseSyncMessage.set('Live sync unavailable - local cache mode');
   }
 
   isTomorrowMatch(match: MatchRecord): boolean {
