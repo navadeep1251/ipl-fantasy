@@ -290,7 +290,14 @@ export class FantasyDashboardComponent {
       .sort((a, b) => b.id - a.id);
   });
 
-  readonly currentMatchPlayers = computed(() => (this.selectedMatch() ? getUniqueMatchPlayers(this.selectedMatch()!) : []));
+  readonly currentMatchPlayers = computed(() => {
+    const match = this.selectedMatch();
+    if (!match) {
+      return [] as string[];
+    }
+
+    return this.getUniquePlayers(match);
+  });
   readonly selectedMatchScore = computed(() => {
     const match = this.selectedMatch();
     if (!match || !this.results()[match.id]) {
@@ -827,7 +834,26 @@ export class FantasyDashboardComponent {
   }
 
   getUniquePlayers(match: MatchRecord) {
-    return getUniqueMatchPlayers(match);
+    const players = getUniqueMatchPlayers(match);
+    if (players.length) {
+      return players;
+    }
+
+    // Fallback for fixtures whose team codes/names are not present in TEAM_PLAYERS mapping.
+    const fromSelections = new Set<string>();
+    for (const userSelections of Object.values(this.selections())) {
+      const pick = userSelections[match.id];
+      if (!pick) {
+        continue;
+      }
+
+      [pick.bestBatsman, pick.bestBowler, pick.dotBallBowler, pick.duckBatsman]
+        .filter((name): name is string => !!name)
+        .forEach((name) => fromSelections.add(name));
+    }
+
+    Object.keys(this.playerScores()[match.id] ?? {}).forEach((name) => fromSelections.add(name));
+    return Array.from(fromSelections).sort();
   }
 
   getInsightsAgeLabel(generatedAt?: string) {
